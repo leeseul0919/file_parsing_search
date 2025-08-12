@@ -3,9 +3,12 @@ package com.example.file_parsing_search.Util;
 import com.example.file_parsing_search.Dto.CapabilityDto;
 import com.example.file_parsing_search.Parser.ObjectParser;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +21,9 @@ public class FileManager {
     private final List<CapabilityDto> fileObjects;
     private final String[] fileTypes = {"iso8211","hdf5","gml"};
     private final Map<String, ObjectParser> parserMap;
+
+    @Value("${file.upload-dir}")
+    private String uploadDir;
 
     public FileManager(List<ObjectParser> parsers) {
         //처음에 실행할 때 System.getProperty("user.dir") + "/uploads" 안에 있는 파일들 읽어서
@@ -42,11 +48,9 @@ public class FileManager {
     private void loadFiles() {
         System.out.println("파일 로드 시작");
 
-        String uploadDir = System.getProperty("user.dir") + "/uploads/";
-
         for(String tmptype : fileTypes) {
-            String tmpuploadDir = uploadDir + tmptype;
-            File dir = new File(tmpuploadDir);
+            Path tmpuploadDir = Paths.get(uploadDir, tmptype);
+            File dir = tmpuploadDir.toFile();
 
             if (!dir.exists() || !dir.isDirectory()) {
                 System.out.println("폴더가 존재하지 않습니다: " + tmpuploadDir);
