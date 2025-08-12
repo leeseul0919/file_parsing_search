@@ -1,11 +1,13 @@
-package com.example.file_parsing_search.Service;
+package com.example.file_parsing_search.service;
 
-import com.example.file_parsing_search.Dto.CapabilityDto;
-import com.example.file_parsing_search.Dto.GetObjectRequestDto;
-import com.example.file_parsing_search.Dto.GetObjectResponseDto;
-import com.example.file_parsing_search.Dto.SearchObject;
-import com.example.file_parsing_search.Parser.ObjectParser;
-import com.example.file_parsing_search.Util.FileManager;
+import com.example.file_parsing_search.domain.History;
+import com.example.file_parsing_search.dto.CapabilityDto;
+import com.example.file_parsing_search.dto.GetObjectRequestDto;
+import com.example.file_parsing_search.dto.GetObjectResponseDto;
+import com.example.file_parsing_search.dto.SearchObject;
+import com.example.file_parsing_search.mapper.HistoryMapper;
+import com.example.file_parsing_search.parser.ObjectParser;
+import com.example.file_parsing_search.util.FileManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -14,10 +16,13 @@ import java.util.List;
 @Service
 public class FileService {
     private final FileManager fileManager;
+    private final HistoryMapper historyMapper;
 
     @Autowired
-    public FileService(FileManager fileManager) {
+    public FileService(FileManager fileManager, HistoryMapper historyMapper) {
         this.fileManager = fileManager;
+        this.historyMapper = historyMapper;
+        System.out.println("service start");
     }
 
     public String hellotest() {
@@ -54,5 +59,10 @@ public class FileService {
         responsedto.setFeatures(objectsList);
 
         return responsedto;
+    }
+
+    public void saveHistory(History history) {
+        System.out.println("file service insert method");
+        historyMapper.insert(history);
     }
 }

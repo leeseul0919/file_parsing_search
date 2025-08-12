@@ -1,4 +1,4 @@
-package com.example.file_parsing_search.Dto;
+package com.example.file_parsing_search.dto;
 
 import java.util.List;
 

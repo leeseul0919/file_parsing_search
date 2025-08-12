@@ -1,21 +1,25 @@
-package com.example.file_parsing_search.Dto;
+package com.example.file_parsing_search.dto;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.List;
 
 public class CapabilityDto {
     private String fileName;
     private String fileType;
-
+    @JsonIgnore
+    private String filePath;
     private List<String> availableObjects;
     private List<Integer> bbox;
 
     public CapabilityDto() {}
 
-    public CapabilityDto(String filePath, String fileType, List<String> availableObjects, List<Integer> bbox) {
-        this.fileName = filePath;
+    public CapabilityDto(String fileName, String fileType, List<String> availableObjects, List<Integer> bbox, String filePath) {
+        this.fileName = fileName;
         this.fileType = fileType;
         this.availableObjects = availableObjects;
         this.bbox = bbox;
+        this.filePath = filePath;
     }
 
     public String getFileName() { return fileName; }
@@ -26,4 +30,6 @@ public class CapabilityDto {
     public void setAvailableObjects(List<String> availableObjects) { this.availableObjects = availableObjects; }
     public List<Integer> getBbox() { return bbox; }
     public void setBbox(List<Integer> bbox) { this.bbox = bbox; }
+    public String getFilePath() { return filePath; }
+    public void setFilePath(String filePath) { this.filePath = filePath; }
 }

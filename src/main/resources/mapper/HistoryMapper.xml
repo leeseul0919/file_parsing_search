@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.file_parsing_search.mapper.HistoryMapper">
+    <insert id="insert" parameterType="com.example.file_parsing_search.domain.History">
+        INSERT INTO history
+        (endpoint, method, request_time, response_time, status_code, duration, request_body, response_body)
+        VALUES
+        (#{endpoint}, #{method}, #{requestTime}, #{responseTime}, #{statusCode}, #{duration}, #{requestBody}::json, #{responseBody}::json)
+    </insert>
+</mapper>

@@ -1,6 +1,4 @@
-package com.example.file_parsing_search.Dto;
-
-import io.swagger.v3.oas.annotations.media.Schema;
+package com.example.file_parsing_search.dto;
 
 public class GetObjectRequestDto {
     private String fileName;
