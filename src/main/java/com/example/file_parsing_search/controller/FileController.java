@@ -43,28 +43,19 @@ public class FileController {
 
         try {
             List<CapabilityDto> capabilities = fileService.capabilityService();
-            System.out.println("service complete");
 
             ResponseDto<List<CapabilityDto>> responseDto = ResponseDto.success(capabilities);
-            System.out.println("convert to ResponseDto");
-
             String responseBodyJson = toJsonSafe(responseDto); //json 변환
-            System.out.println("convert to Json");
-
             LocalDateTime responseTime = LocalDateTime.now();
-            System.out.println("complete response");
 
             saveHistory("/capability","GET",requestTime,responseTime,HttpStatus.OK.value(),-1, requestBodyJson,responseBodyJson);
-
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
             ResponseDto<List<CapabilityDto>> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
-
             LocalDateTime errorTime = LocalDateTime.now();
 
             saveHistory("/capability", "GET", requestTime, errorTime, HttpStatus.INTERNAL_SERVER_ERROR.value(), -1, requestBodyJson, responseBodyJson);
-
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDto);
         }
     }
@@ -84,7 +75,6 @@ public class FileController {
             LocalDateTime responseTime = LocalDateTime.now();
 
             saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),responsedto.getSearchTime(), requestBodyJson,responseBodyJson);
-
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
             long serviceEnd = System.currentTimeMillis();
@@ -92,11 +82,9 @@ public class FileController {
 
             ResponseDto<?> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
-
             LocalDateTime errorTime = LocalDateTime.now();
 
             saveHistory("/getObject", "POST", requestTime, errorTime, HttpStatus.INTERNAL_SERVER_ERROR.value(), serviceDurationMs, requestBodyJson, responseBodyJson);
-
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDto);
         }
     }
@@ -123,19 +111,20 @@ public class FileController {
 
     private void saveHistory(String endpoint, String method, LocalDateTime requestTime, LocalDateTime responseTime, int statusCode, long duration, String requestBodyJson, String responseBodyJson) {
         System.out.println("save history start");
+        try {
+            History history = new History();
+            history.setEndpoint(endpoint);
+            history.setMethod(method);
+            history.setRequestTime(requestTime);
+            history.setResponseTime(responseTime);
+            history.setStatusCode(statusCode);
+            history.setDuration(duration);
+            history.setRequestBody(requestBodyJson);
+            history.setResponseBody(responseBodyJson);
 
-        History history = new History();
-        history.setEndpoint(endpoint);
-        history.setMethod(method);
-        history.setRequestTime(requestTime);
-        history.setResponseTime(responseTime);
-        history.setStatusCode(statusCode);
-        history.setDuration(duration);
-        history.setRequestBody(requestBodyJson);
-        history.setResponseBody(responseBodyJson);
-
-        System.out.println("history complete before save");
-
-        fileService.saveHistory(history);
+            fileService.saveHistory(history);
+        } catch (Exception e) {
+            System.out.println("Save Fail: " + e.getMessage());
+        }
     }
 }
