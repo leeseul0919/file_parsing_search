@@ -1,15 +1,15 @@
 package com.example.file_parsing_search.dto;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.List;
 
+@Setter
+@Getter
 public class GeometryInfo {
     private String type;
     private List<?> coordinates;
 
     public GeometryInfo() { }
-
-    public String getGeoType() { return type; }
-    public void setGeoType(String type) { this.type = type; }
-    public List<?> getCoordinates() { return coordinates; }
-    public void setCoordinates(List<?> coordinates) { this.coordinates = coordinates; }
 }

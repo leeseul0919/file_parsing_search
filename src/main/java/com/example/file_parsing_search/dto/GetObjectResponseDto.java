@@ -1,15 +1,16 @@
 package com.example.file_parsing_search.dto;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.List;
 
+@Setter
+@Getter
 public class GetObjectResponseDto {
     private long searchTime;
     private List<SearchObject> features;
 
     public GetObjectResponseDto() { }
 
-    public long getSearchTime() { return searchTime; }
-    public void setSearchTime(long searchTime) { this.searchTime = searchTime; }
-    public List<SearchObject> getFeatures() { return features; }
-    public void setFeatures(List<SearchObject> features) { this.features = features; }
 }
