@@ -42,7 +42,8 @@ public class ISO8211Parser implements ObjectParser{
         fileBBOX.add(100.0);
         fileBBOX.add(100.0);
 
-        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, filePath);
+        String normalizedPath = filePath.replace("\\", "/");
+        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, normalizedPath);
     }
 
     @Override

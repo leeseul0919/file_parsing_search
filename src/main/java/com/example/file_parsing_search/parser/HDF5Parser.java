@@ -42,7 +42,8 @@ public class HDF5Parser implements ObjectParser{
         fileBBOX.add(100.0);
         fileBBOX.add(100.0);
 
-        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, filePath);
+        String normalizedPath = filePath.replace("\\", "/");
+        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, normalizedPath);
     }
 
     @Override
@@ -50,7 +51,7 @@ public class HDF5Parser implements ObjectParser{
         List<SearchObject> hdf5features = new ArrayList<>();
 
         // --- 파일 파싱 되었을 때 여기로 변경 ---
-        //1. System.getProperty("user.dir") + "/uploads" + "/iso8211/" + fileInfo.getFileName()으로 접근해서 파일 로드
+        //1. System.getProperty("user.dir") + "/uploads" + "/iso8211/" + fileInfo.getFilePath()으로 접근해서 파일 로드
         //2. request.getGeometry().getGeoType(), request.getGeometry().getCoordinates() 으로 파일에 사용자가 요청한 범위 계산
         //3. 해당 범위 안에 있는 객체들 탐색, 한 객체에 대해 GeoJson 표준에 들어가는 정보들 뽑아서 SearchObject객체로 만들고
         //4. iso8211features에 add

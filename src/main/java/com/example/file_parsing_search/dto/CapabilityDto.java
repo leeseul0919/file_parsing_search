@@ -11,7 +11,6 @@ import java.util.List;
 public class CapabilityDto {
     private String fileName;
     private String fileType;
-    @JsonIgnore
     private String filePath;
     private List<String> availableObjects;
     private List<Double> bbox;

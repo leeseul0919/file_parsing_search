@@ -6,7 +6,7 @@ import lombok.Setter;
 @Setter
 @Getter
 public class GetObjectRequestDto {
-    private String fileName;
+    private String filePath;
     private GeometryInfo geometryInfo;
 
     public GetObjectRequestDto() { }

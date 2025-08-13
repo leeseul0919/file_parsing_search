@@ -43,8 +43,8 @@ public class FileService {
 
         //fileManager.getFilePath()
         //1. 파일명 받은걸로 파일 정보 불러오고
-        CapabilityDto fileInfo = fileManager.getFileInfo(request.getFileName())
-                .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + request.getFileName()));
+        CapabilityDto fileInfo = fileManager.getFileInfo(request.getFilePath())
+                .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + request.getFilePath()));
 
         //2. 파일 타입에 따른 파서 불러와서 작업 (파일 정보, request)
         ObjectParser parser = fileManager.getParserByFileType(fileInfo.getFileType());

@@ -77,7 +77,7 @@ public class FileManager {
 
                 CapabilityDto capabilityInfo = parser.getcapability(file.getAbsolutePath(), fileType);
                 resultFiles.add(capabilityInfo);
-                //System.out.println("로드 완료: " + file.getName());
+                System.out.println("로드 완료: " + capabilityInfo.getFilePath());
             }
         }
         log.info("파일 로드 끝");
@@ -116,9 +116,9 @@ public class FileManager {
         return List.copyOf(fileObjects); //내부 리스트 인스턴스 자체를 돌려주는건 위험함, 방어적 복사 사용해보기
     }
 
-    public Optional<CapabilityDto> getFileInfo(String filename) {
+    public Optional<CapabilityDto> getFileInfo(String filepath) {
         for (CapabilityDto tmp : fileObjects) {
-            if (tmp.getFileName().equals(filename)) {
+            if (tmp.getFilePath().equals(filepath)) {
                 return Optional.of(tmp);
             }
         }
