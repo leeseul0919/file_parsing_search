@@ -3,6 +3,7 @@ package com.example.file_parsing_search.util;
 import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.parser.ObjectParser;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class FileManager {
     private volatile List<CapabilityDto> fileObjects;
     private final String[] fileTypes = {"iso8211","hdf5","gml"};
@@ -28,7 +30,7 @@ public class FileManager {
         //CapabilityDto 객체로 만들어서 fileObjects에다가 저장해두기?
 
         parserMap = parsers.stream().collect(Collectors.toMap(ObjectParser::getSupportedFileType, Function.identity()));
-        System.out.println(parserMap);
+        log.info(parserMap.values().toString());
         this.fileObjects = new ArrayList<>();
     }
 
@@ -38,19 +40,19 @@ public class FileManager {
 
     @PostConstruct
     public void init() {
-        System.out.println("파일 정보 세팅");
+        log.info("파일 정보 세팅");
         List<CapabilityDto> next = new ArrayList<>();
         next = loadFiles();
         fileObjects = next;
     }
 
     private List<CapabilityDto> loadFiles() {
-        System.out.println("파일 로드 시작");
+        log.info("파일 로드 시작");
         List<CapabilityDto> resultFiles = new ArrayList<>();
 
         File baseDir = new File(uploadDir);
         if (!baseDir.exists() || !baseDir.isDirectory()) {
-            System.out.println("기본 업로드 폴더가 없습니다: " + uploadDir);
+            log.error("기본 업로드 폴더가 없습니다: {}", uploadDir);
             return resultFiles;
         }
 
@@ -75,10 +77,10 @@ public class FileManager {
 
                 CapabilityDto capabilityInfo = parser.getcapability(file.getAbsolutePath(), fileType);
                 resultFiles.add(capabilityInfo);
-                System.out.println("로드 완료: " + file.getName() + " 타입: " + fileType);
+                //System.out.println("로드 완료: " + file.getName());
             }
         }
-        System.out.println("파일 로드 끝");
+        log.info("파일 로드 끝");
         return resultFiles;
     }
 

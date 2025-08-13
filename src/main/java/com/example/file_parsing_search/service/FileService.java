@@ -22,7 +22,6 @@ public class FileService {
     public FileService(FileManager fileManager, HistoryMapper historyMapper) {
         this.fileManager = fileManager;
         this.historyMapper = historyMapper;
-        System.out.println("service start");
     }
 
     public String hellotest() {
@@ -62,7 +61,6 @@ public class FileService {
     }
 
     public void saveHistory(History history) {
-        System.out.println("file service insert method");
         historyMapper.insert(history);
     }
 }
