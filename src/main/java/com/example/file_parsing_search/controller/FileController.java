@@ -78,19 +78,17 @@ public class FileController {
 
         try {
             GetObjectResponseDto responsedto = fileService.getObjectResponseDto(requestDto);
-            long serviceEnd = System.currentTimeMillis();
-            int serviceDurationMs = (int) (serviceEnd - serviceStart);
 
             ResponseDto<?> responseDto = ResponseDto.success(responsedto);
             String responseBodyJson = toJsonSafe(responseDto);
             LocalDateTime responseTime = LocalDateTime.now();
 
-            saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),serviceDurationMs, requestBodyJson,responseBodyJson);
+            saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),responsedto.getSearchTime(), requestBodyJson,responseBodyJson);
 
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
             long serviceEnd = System.currentTimeMillis();
-            int serviceDurationMs = (int) (serviceEnd - serviceStart);
+            long serviceDurationMs = (long) (serviceEnd - serviceStart);
 
             ResponseDto<?> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
@@ -123,7 +121,7 @@ public class FileController {
         }
     }
 
-    private void saveHistory(String endpoint, String method, LocalDateTime requestTime, LocalDateTime responseTime, int statusCode, int duration, String requestBodyJson, String responseBodyJson) {
+    private void saveHistory(String endpoint, String method, LocalDateTime requestTime, LocalDateTime responseTime, int statusCode, long duration, String requestBodyJson, String responseBodyJson) {
         System.out.println("save history start");
 
         History history = new History();

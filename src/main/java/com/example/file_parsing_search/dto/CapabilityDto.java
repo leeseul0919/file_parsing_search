@@ -14,11 +14,11 @@ public class CapabilityDto {
     @JsonIgnore
     private String filePath;
     private List<String> availableObjects;
-    private List<Integer> bbox;
+    private List<Double> bbox;
 
     public CapabilityDto() {}
 
-    public CapabilityDto(String fileName, String fileType, List<String> availableObjects, List<Integer> bbox, String filePath) {
+    public CapabilityDto(String fileName, String fileType, List<String> availableObjects, List<Double> bbox, String filePath) {
         this.fileName = fileName;
         this.fileType = fileType;
         this.availableObjects = availableObjects;

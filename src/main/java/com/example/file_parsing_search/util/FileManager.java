@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 @Component
 public class FileManager {
-    private final List<CapabilityDto> fileObjects;
+    private volatile List<CapabilityDto> fileObjects;
     private final String[] fileTypes = {"iso8211","hdf5","gml"};
     private final Map<String, ObjectParser> parserMap;
 
@@ -39,17 +39,19 @@ public class FileManager {
     @PostConstruct
     public void init() {
         System.out.println("파일 정보 세팅");
-        fileObjects.clear();
-        loadFiles();
+        List<CapabilityDto> next = new ArrayList<>();
+        next = loadFiles();
+        fileObjects = next;
     }
 
-    private void loadFiles() {
+    private List<CapabilityDto> loadFiles() {
         System.out.println("파일 로드 시작");
+        List<CapabilityDto> resultFiles = new ArrayList<>();
 
         File baseDir = new File(uploadDir);
         if (!baseDir.exists() || !baseDir.isDirectory()) {
             System.out.println("기본 업로드 폴더가 없습니다: " + uploadDir);
-            return;
+            return resultFiles;
         }
 
         List<File> files = new ArrayList<>();
@@ -72,12 +74,12 @@ public class FileManager {
                 }
 
                 CapabilityDto capabilityInfo = parser.getcapability(file.getAbsolutePath(), fileType);
-                fileObjects.add(capabilityInfo);
+                resultFiles.add(capabilityInfo);
                 System.out.println("로드 완료: " + file.getName() + " 타입: " + fileType);
             }
         }
-
         System.out.println("파일 로드 끝");
+        return resultFiles;
     }
 
     private void findFilesRecursively(File dir, List<File> files) {
@@ -109,7 +111,7 @@ public class FileManager {
     }
 
     public List<CapabilityDto> capabilityResponse() {
-        return fileObjects; // 비어있으면 size() == 0 인 상태로 그대로 반환
+        return List.copyOf(fileObjects); //내부 리스트 인스턴스 자체를 돌려주는건 위험함, 방어적 복사 사용해보기
     }
 
     public Optional<CapabilityDto> getFileInfo(String filename) {

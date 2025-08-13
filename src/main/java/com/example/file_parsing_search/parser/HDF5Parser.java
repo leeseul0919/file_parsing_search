@@ -3,6 +3,7 @@ package com.example.file_parsing_search.parser;
 import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Paths;
@@ -12,6 +13,9 @@ import java.util.List;
 
 @Component
 public class HDF5Parser implements ObjectParser{
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
     @Override
     public String getSupportedFileType() {
         return "hdf5";  // 이 파서는 hdf5
@@ -22,7 +26,7 @@ public class HDF5Parser implements ObjectParser{
         String fileName = Paths.get(filePath).getFileName().toString();
 
         List<String> objectList = new ArrayList<>();
-        List<Integer> fileBBOX = new ArrayList<>();
+        List<Double> fileBBOX = new ArrayList<>();
 
         // --- 파일 파싱 되었을 때 여기로 변경 ---
         //1. 전달받은 filePath로 접근
@@ -33,10 +37,10 @@ public class HDF5Parser implements ObjectParser{
         // --- 파서 완성 전 mock 초기값 ---
         objectList.add("ObjectA");
         objectList.add("ObjectB");
-        fileBBOX.add(0);
-        fileBBOX.add(0);
-        fileBBOX.add(100);
-        fileBBOX.add(100);
+        fileBBOX.add(0.0);
+        fileBBOX.add(0.0);
+        fileBBOX.add(100.0);
+        fileBBOX.add(100.0);
 
         return new CapabilityDto(fileName, fileType, objectList, fileBBOX, filePath);
     }

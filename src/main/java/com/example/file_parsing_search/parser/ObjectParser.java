@@ -7,7 +7,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-@Component
 public interface ObjectParser {
     String getSupportedFileType();
     CapabilityDto getcapability(String filePath, String fileType);

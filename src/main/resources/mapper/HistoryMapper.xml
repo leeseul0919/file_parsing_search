@@ -7,6 +7,6 @@
         INSERT INTO history
         (endpoint, method, request_time, response_time, status_code, duration, request_body, response_body)
         VALUES
-        (#{endpoint}, #{method}, #{requestTime}, #{responseTime}, #{statusCode}, #{duration}, #{requestBody}::json, #{responseBody}::json)
+        (#{endpoint}, #{method}, #{requestTime}, #{responseTime}, #{statusCode}, #{duration}, #{requestBody}::jsonb, #{responseBody}::jsonb)
     </insert>
 </mapper>
