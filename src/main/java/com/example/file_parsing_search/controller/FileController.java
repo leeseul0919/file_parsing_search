@@ -25,7 +25,6 @@ import java.util.List;
 public class FileController {
     private final FileService fileService;
     private final ObjectMapper objectMapper;
-    //private static final Logger logger = LoggerFactory.getLogger(FileController.class);
 
     @Autowired
     public FileController(FileService fileService, ObjectMapper objectMapper) {
@@ -46,18 +45,18 @@ public class FileController {
         String requestBodyJson = null;
 
         try {
-            List<CapabilityDto> capabilities = fileService.capabilityService();
+            List<CapabilityDto> capabilities = fileService.capabilityService(); // Todo: List<CapabilityDto>가 빈 리스트일 때 예외 발생?
             log.info("capability process complete");
 
-            ResponseDto<List<CapabilityDto>> responseDto = ResponseDto.success(capabilities);
-            String responseBodyJson = toJsonSafe(responseDto); //json 변환
+            ResponseDto<List<CapabilityDto>> responseDto = ResponseDto.success(capabilities);   // Todo: 객체 생성할 때 예외 발생?
+            String responseBodyJson = toJsonSafe(responseDto); // Todo: json 변환할 때 예외 발생?
             LocalDateTime responseTime = LocalDateTime.now();
             log.info("Success to get service scope");
 
-            saveHistory("/capability","GET",requestTime,responseTime,HttpStatus.OK.value(),-1, requestBodyJson,responseBodyJson);
+            saveHistory("/capability","GET",requestTime,responseTime,HttpStatus.OK.value(),-1, requestBodyJson,responseBodyJson);   // Todo: DB에 저장할 때 예외 발생?
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
-            ResponseDto<List<CapabilityDto>> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
+            ResponseDto<List<CapabilityDto>> errorDto = ResponseDto.fail(e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
             LocalDateTime errorTime = LocalDateTime.now();
             log.error("Fail to get service scope - {}" ,e.getMessage(), e);
@@ -75,7 +74,7 @@ public class FileController {
         long serviceStart = System.currentTimeMillis();
 
         try {
-            GetObjectResponseDto getobjectResponse = fileService.getObjectResponseDto(requestDto);
+            GetObjectResponseDto getobjectResponse = fileService.getObjectResponseDto(requestDto);  // Todo:
             log.info("getObject process complete");
 
             long serviceEnd = System.currentTimeMillis();
@@ -94,7 +93,7 @@ public class FileController {
             long serviceEnd = System.currentTimeMillis();
             long serviceDurationMs = (long) (serviceEnd - serviceStart);
 
-            ResponseDto<?> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
+            ResponseDto<?> errorDto = ResponseDto.fail(e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
             LocalDateTime errorTime = LocalDateTime.now();
             log.error("Fail to make response - {}" ,e.getMessage(), e);
@@ -104,6 +103,7 @@ public class FileController {
         }
     }
 
+    //파일 추가/삭제 했을 때 다시 파일 목록 로드, 임의로 만든 api
     @GetMapping("/init")
     @Operation(summary = "Reload Files", description = "파일들 다시 로드하기")
     public ResponseEntity<ResponseDto<?>> uploadfileLoad() {
@@ -114,7 +114,7 @@ public class FileController {
         } catch (Exception e) {
             log.error("Fail to reload files - {}" ,e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ResponseDto.fail("E500", e.getMessage(), Collections.emptyList()));
+                    .body(ResponseDto.fail(e.getMessage(), Collections.emptyList()));
         }
     }
 

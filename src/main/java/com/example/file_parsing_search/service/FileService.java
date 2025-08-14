@@ -40,15 +40,18 @@ public class FileService {
         GetObjectResponseDto responsedto = new GetObjectResponseDto();
 
         //1. 파일명 받은걸로 파일 정보 불러오고
+        // Todo: 파일 못 찾았을 때 예외 발생
         CapabilityDto fileInfo = fileManager.getFileInfo(request.getFilePath())
                 .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + request.getFilePath()));
 
         //2. 파일 타입에 따른 파서 불러와서 작업 (파일 정보, request)
+        // Todo: 해당 파일에 해당하는 파서 불러올 때 예외 발생?
         ObjectParser parser = fileManager.getParserByFileType(fileInfo.getFileType());
         if (parser == null) {
             throw new UnsupportedOperationException("Unsupported file type: " + fileInfo.getFileType());
         }
-        List<SearchObject> objectsList = parser.parse(fileInfo,request);    // TODO: 파서로 파싱하고 결과에 대한 예외 처리 되야함
+        // Todo: 파싱할 때 예외 발생? -- 이건 추후 파싱 로직 짜고 생각하기
+        List<SearchObject> objectsList = parser.parse(fileInfo,request);
 
         responsedto.setFeatures(objectsList);
 

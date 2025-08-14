@@ -7,6 +7,7 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
+// Todo: 파싱 결과에 따라 구조 달라질수도
 @Getter
 @Setter
 public class SearchObject {
