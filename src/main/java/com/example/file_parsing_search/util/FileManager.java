@@ -80,7 +80,7 @@ public class FileManager {
                 System.out.println("로드 완료: " + capabilityInfo.getFilePath());
             }
         }
-        log.info("파일 로드 끝");
+        log.info("파일 로드 끝, 파일 개수: {}",fileObjects.size());
         return resultFiles;
     }
 
@@ -117,8 +117,10 @@ public class FileManager {
     }
 
     public Optional<CapabilityDto> getFileInfo(String filepath) {
+        if (filepath == null) return Optional.empty();
+        String normalizedpath = filepath.replace("\\", "/").trim();
         for (CapabilityDto tmp : fileObjects) {
-            if (tmp.getFilePath().equals(filepath)) {
+            if (tmp.getFilePath().equals(normalizedpath)) {
                 return Optional.of(tmp);
             }
         }

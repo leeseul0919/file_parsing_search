@@ -39,22 +39,17 @@ public class FileService {
     public GetObjectResponseDto getObjectResponseDto(GetObjectRequestDto request) {
         GetObjectResponseDto responsedto = new GetObjectResponseDto();
 
-        long startTime = System.currentTimeMillis();
-
-        //fileManager.getFilePath()
         //1. 파일명 받은걸로 파일 정보 불러오고
         CapabilityDto fileInfo = fileManager.getFileInfo(request.getFilePath())
                 .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + request.getFilePath()));
 
         //2. 파일 타입에 따른 파서 불러와서 작업 (파일 정보, request)
         ObjectParser parser = fileManager.getParserByFileType(fileInfo.getFileType());
-        List<SearchObject> objectsList = parser.parse(fileInfo,request);
+        if (parser == null) {
+            throw new UnsupportedOperationException("Unsupported file type: " + fileInfo.getFileType());
+        }
+        List<SearchObject> objectsList = parser.parse(fileInfo,request);    // TODO: 파서로 파싱하고 결과에 대한 예외 처리 되야함
 
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-
-        //3. responsedto 값 설정
-        responsedto.setSearchTime(duration);
         responsedto.setFeatures(objectsList);
 
         return responsedto;

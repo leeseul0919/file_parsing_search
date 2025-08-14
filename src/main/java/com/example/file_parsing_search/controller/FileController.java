@@ -8,6 +8,7 @@ import com.example.file_parsing_search.dto.ResponseDto;
 import com.example.file_parsing_search.service.FileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -59,7 +60,7 @@ public class FileController {
             ResponseDto<List<CapabilityDto>> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
             LocalDateTime errorTime = LocalDateTime.now();
-            log.error("error: {}","Fail to get service scope - " + e.getMessage());
+            log.error("Fail to get service scope - {}" ,e.getMessage(), e);
 
             saveHistory("/capability", "GET", requestTime, errorTime, HttpStatus.INTERNAL_SERVER_ERROR.value(), -1, requestBodyJson, responseBodyJson);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDto);
@@ -68,7 +69,7 @@ public class FileController {
 
     @Operation(summary = "Search Object Info", description = "특정 파일의 특정 범위에 있는 객체들 정보를 반환")
     @PostMapping("/getObject")
-    public ResponseEntity<ResponseDto<?>> getObject(@RequestBody GetObjectRequestDto requestDto) {
+    public ResponseEntity<ResponseDto<?>> getObject(@Valid @RequestBody GetObjectRequestDto requestDto) {
         LocalDateTime requestTime = LocalDateTime.now();
         String requestBodyJson = toJsonSafe(requestDto);
         long serviceStart = System.currentTimeMillis();
@@ -77,21 +78,26 @@ public class FileController {
             GetObjectResponseDto getobjectResponse = fileService.getObjectResponseDto(requestDto);
             log.info("getObject process complete");
 
+            long serviceEnd = System.currentTimeMillis();
+            long serviceDurationMs = (long) (serviceEnd - serviceStart);
+
             ResponseDto<?> responseDto = ResponseDto.success(getobjectResponse);
             String responseBodyJson = toJsonSafe(responseDto);
             LocalDateTime responseTime = LocalDateTime.now();
             log.info("Success to search file");
 
-            saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),getobjectResponse.getSearchTime(), requestBodyJson,responseBodyJson);
+            saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),serviceDurationMs, requestBodyJson,responseBodyJson);
             return ResponseEntity.ok(responseDto);
         } catch (Exception e) {
+            log.error("Fail to search file - {}" ,e.getMessage(), e);
+
             long serviceEnd = System.currentTimeMillis();
             long serviceDurationMs = (long) (serviceEnd - serviceStart);
 
             ResponseDto<?> errorDto = ResponseDto.fail("E500", e.getMessage(), Collections.emptyList());
             String responseBodyJson = toJsonSafe(errorDto);
             LocalDateTime errorTime = LocalDateTime.now();
-            log.error("error: {}","Fail to search file - " + e.getMessage());
+            log.error("Fail to make response - {}" ,e.getMessage(), e);
 
             saveHistory("/getObject", "POST", requestTime, errorTime, HttpStatus.INTERNAL_SERVER_ERROR.value(), serviceDurationMs, requestBodyJson, responseBodyJson);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDto);
@@ -106,7 +112,7 @@ public class FileController {
             log.info("Success to reload files");
             return ResponseEntity.ok(ResponseDto.success("ok"));
         } catch (Exception e) {
-            log.error("error:{}", "Fail to reload files - " + e.getMessage());
+            log.error("Fail to reload files - {}" ,e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ResponseDto.fail("E500", e.getMessage(), Collections.emptyList()));
         }
@@ -114,10 +120,10 @@ public class FileController {
 
     private String toJsonSafe(Object obj) {
         try {
-            log.info("Success to serialize");
+            log.debug("Success to serialize");
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
-            log.error("error:{}", "Failed to serialize - " + e.getMessage());
+            log.error("Failed to serialize - {}" ,e.getMessage(), e);
             return "{\"error\": \"Failed to serialize\"}";
         }
     }
@@ -137,8 +143,7 @@ public class FileController {
             fileService.saveHistory(history);
             log.info("save success");
         } catch (Exception e) {
-            log.error("error:{}", "save fail - " + e.getMessage());
-            //System.out.println();
+            log.error("save fail - {}" ,e.getMessage(), e);
         }
     }
 }
