@@ -39,7 +39,7 @@ public class FileService {
         return fileManager.capabilityResponse();
     }
 
-    public GetObjectResponseDto getObjectResponseDto(GetObjectRequestDto request) {
+    public GetObjectResponseDto getObjectResponseDto(GetObjectRequestDto request) throws ParserConfigurationException, IOException, SAXException {
         GetObjectResponseDto responsedto = new GetObjectResponseDto();
 
         //1. 파일명 받은걸로 파일 정보 불러오고
@@ -54,7 +54,7 @@ public class FileService {
             throw new UnsupportedOperationException("Unsupported file type: " + fileInfo.getFileType());
         }
         // Todo: 파싱할 때 예외 발생? -- 이건 추후 파싱 로직 짜고 생각하기
-        List<SearchObject> objectsList = parser.parse(fileInfo,request);
+        List<SearchObject> objectsList = parser.parse(request);
 
         responsedto.setFeatures(objectsList);
 

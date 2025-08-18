@@ -44,7 +44,7 @@ public class GMLParser implements ObjectParser{
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = (Document) builder.parse(gmlFilePath);
-        doc.getDocumentElement().normalize();  // dom tree 구조로 만들어 놓기
+        doc.getDocumentElement().normalize();  //모든 요소들을 dom tree 구조로 만들어 놓기
 
         //2. 객체 목록들과 파일의 bbox 정보 가져오기
         //3. ObjectList, fileBBOX에 넣고
@@ -73,10 +73,6 @@ public class GMLParser implements ObjectParser{
                 String[] upper = envelope.getElementsByTagName("gml:upperCorner").item(0).getTextContent().split(" ");
                 upperLon = Double.parseDouble(upper[0]);
                 upperLat = Double.parseDouble(upper[1]);
-
-                //System.out.println(srsName + "->" + epsg);
-                //System.out.println("LowerCorner (lon, lat): (" + lowerLon + "," + lowerLat + ")");
-                //System.out.println("UpperCorner (lon, lat): (" + upperLon + "," + upperLat + ")");
             }
         }
         List<Double> lower = List.of(lowerLon,lowerLat);
@@ -89,13 +85,13 @@ public class GMLParser implements ObjectParser{
 
         for (int i=0;i< memberList.getLength();i++) {
             Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
-            NodeList memberChildNodes = member.getElementsByTagName("*");
-            Element firstChild = (Element) memberChildNodes.item(0);
+            NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
+            Element firstChild = (Element) memberChildNodes.item(0);    //그 중에서 가장 앞에 있는 노드가 객체 타입 정의
 
-            tmpList.add(firstChild.getTagName());
+            tmpList.add(firstChild.getTagName());   //태그 이름을 집어넣기
             //System.out.println(firstChild.getTagName());
         }
-        Set<String> tmpSet = new HashSet<String>(tmpList);
+        Set<String> tmpSet = new HashSet<String>(tmpList);  //객체 종류 목록이니까 중복 제거해서
         List<String> resultList = new ArrayList<>(tmpSet);
 
         String normalizedPath = filePath.replace("\\", "/");
@@ -103,22 +99,59 @@ public class GMLParser implements ObjectParser{
     }
 
     @Override
-    public List<SearchObject> parse(CapabilityDto fileInfo, GetObjectRequestDto request) {
+    public List<SearchObject> parse(GetObjectRequestDto request) throws ParserConfigurationException, IOException, SAXException {
         List<SearchObject> gmlfeatures = new ArrayList<>();
 
-        // --- 파일 파싱 되었을 때 여기로 변경 ---
-        //1. System.getProperty("user.dir") + "/uploads" + "/iso8211/" + fileInfo.getFilePath()으로 접근해서 파일 로드
-        //2. request.getGeometry().getGeoType(), request.getGeometry().getCoordinates() 으로 파일에 사용자가 요청한 범위 계산
-        //3. 해당 범위 안에 있는 객체들 탐색, 한 객체에 대해 GeoJson 표준에 들어가는 정보들 뽑아서 SearchObject객체로 만들고
-        //4. iso8211features에 add
+        //서비스 로직에서 요청이 들어온 파일 경로가 있는지 체크하고 request 넘겨주니까 그냥 그대로 request의 getFilePath 사용
+        String gmlFilePath = request.getFilePath();
 
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = (Document) builder.parse(gmlFilePath);
+        doc.getDocumentElement().normalize();   //모든 요소들을 dom tree 구조로 만들어 두고
+
+        NodeList memberList = doc.getElementsByTagName("member");
+        for (int i=0;i< memberList.getLength();i++) {
+            Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
+
+            NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
+            Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
+            String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
+            //System.out.println(firstChild.getTagName()+": "+gmlId);
+
+            NodeList geoList = member.getElementsByTagName("geometry"); //geometry 노드들을 불러서
+            for(int j=0;j< geoList.getLength();j++) {
+                Element geoChild = (Element) geoList.item(j);
+
+                NodeList geoChildNodes = geoChild.getElementsByTagName("*");    //하위 요소 노드들을 다 불러서
+                Element geoType = (Element) geoChildNodes.item(geoChildNodes.getLength()-2);    //끝에서 두번째 네임 태그엔 객체 형식(point, linering 등)
+                Element geoInfo = (Element) geoChildNodes.item(geoChildNodes.getLength()-1);    //맨 끝에거는 객체의 위경도 정보 (pos/pos list)
+
+                String posText = geoInfo.getTextContent().trim(); // 앞뒤 공백 제거
+                String[] parts = posText.split("\\s+");
+                List<List<Double>> lonlat = new ArrayList<>();
+                for(int k=0;k<parts.length/2;k++) {
+                    double tmplon = Double.parseDouble(parts[2*k]);
+                    double tmplat = Double.parseDouble(parts[2*k+1]);
+                    List<Double> tmplonlat = List.of(tmplon,tmplat);
+                    lonlat.add(tmplonlat);
+                }
+                // request에 있는 범위 안에 드는지 체크하는 조건문 추가
+
+                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,geoType.getTagName(),lonlat);
+                gmlfeatures.add(newobject);
+            }
+        }
+
+        /*
         // --- 파서 완성 전 mock 초기값 ---
         List<?> coordinates1 = Arrays.asList(127.0, 37.0);
-        SearchObject newobject1 = new SearchObject("Point",coordinates1,"Example Point","This is an example point feature.");
+        SearchObject newobject1 = new SearchObject("feature","0000","Point",coordinates1);
         List<?> coordinates2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
-        SearchObject newobject2 = new SearchObject("Polygon",coordinates2,"강남역 주변","강남역 주변 지역");
+        SearchObject newobject2 = new SearchObject("feature","0000","Polygon",coordinates2);
         gmlfeatures.add(newobject1);
         gmlfeatures.add(newobject2);
+         */
 
         return gmlfeatures;
     }

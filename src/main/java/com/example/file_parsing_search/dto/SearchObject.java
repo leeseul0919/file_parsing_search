@@ -11,18 +11,23 @@ import lombok.Setter;
 @Getter
 @Setter
 public class SearchObject {
-    private String type = "Feature";
+    private String type;
+    private String id;
     private GeometryInfo geometryInfo;
-    private Map<String, Object> properties;
+    //private Map<String, Object> properties;
 
     public SearchObject() { }
-    public SearchObject(String geoType, List<?> coordinates, String propName, String propDesc) {
+
+    public SearchObject(String type, String id,String geoType, List<?> coordinates) {
+        this.type = type;
+        this.id = id;
+
         this.geometryInfo = new GeometryInfo();
         geometryInfo.setType(geoType);
         geometryInfo.setCoordinates(coordinates);
 
-        this.properties = new HashMap<>();
-        properties.put("name", propName);
-        properties.put("description", propDesc);
+        //this.properties = new HashMap<>();
+        //properties.put("name", propName);
+        //properties.put("description", propDesc);
     }
 }

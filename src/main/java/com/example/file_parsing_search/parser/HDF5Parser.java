@@ -54,7 +54,7 @@ public class HDF5Parser implements ObjectParser{
     }
 
     @Override
-    public List<SearchObject> parse(CapabilityDto fileInfo, GetObjectRequestDto request) {
+    public List<SearchObject> parse(GetObjectRequestDto request) {
         List<SearchObject> hdf5features = new ArrayList<>();
 
         // --- 파일 파싱 되었을 때 여기로 변경 ---
@@ -65,9 +65,9 @@ public class HDF5Parser implements ObjectParser{
 
         // --- 파서 완성 전 mock 초기값 ---
         List<?> coordinates1 = Arrays.asList(127.0, 37.0);
-        SearchObject newobject1 = new SearchObject("Point",coordinates1,"Example Point","This is an example point feature.");
+        SearchObject newobject1 = new SearchObject("feature","0000","Point",coordinates1);
         List<?> coordinates2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
-        SearchObject newobject2 = new SearchObject("Polygon",coordinates2,"강남역 주변","강남역 주변 지역");
+        SearchObject newobject2 = new SearchObject("feature","0000","Polygon",coordinates2);
         hdf5features.add(newobject1);
         hdf5features.add(newobject2);
 
