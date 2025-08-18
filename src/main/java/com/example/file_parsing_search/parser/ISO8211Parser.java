@@ -26,7 +26,12 @@ public class ISO8211Parser implements ObjectParser{
         String fileName = Paths.get(filePath).getFileName().toString();
 
         List<String> objectList = new ArrayList<>();
-        List<Double> fileBBOX = new ArrayList<>();
+        List<List<Double>> fileBBOX = new ArrayList<>();
+        double lowerLon = 0.0;
+        double lowerLat = 0.0;
+        double upperLon = 0.0;
+        double upperLat = 0.0;
+        String epsg = "";
 
         // --- 파일 파싱 되었을 때 여기로 변경 ---
         //1. 전달받은 filePath로 접근
@@ -37,13 +42,14 @@ public class ISO8211Parser implements ObjectParser{
         // --- 파서 완성 전 mock 초기값 ---
         objectList.add("ObjectA");
         objectList.add("ObjectB");
-        fileBBOX.add(0.0);
-        fileBBOX.add(0.0);
-        fileBBOX.add(100.0);
-        fileBBOX.add(100.0);
+        List<Double> lower = List.of(lowerLon,lowerLat);
+        List<Double> upper = List.of(upperLon,upperLat);
+        fileBBOX.add(lower);
+        fileBBOX.add(upper);
+        epsg = "4326";
 
         String normalizedPath = filePath.replace("\\", "/");
-        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, normalizedPath);
+        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, normalizedPath, epsg);
     }
 
     @Override

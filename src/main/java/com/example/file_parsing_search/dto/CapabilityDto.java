@@ -13,15 +13,17 @@ public class CapabilityDto {
     private String fileType;
     private String filePath;
     private List<String> availableObjects;
-    private List<Double> bbox;
+    private String epsg;
+    private List<List<Double>> bbox;
 
     public CapabilityDto() {}
 
-    public CapabilityDto(String fileName, String fileType, List<String> availableObjects, List<Double> bbox, String filePath) {
+    public CapabilityDto(String fileName, String fileType, List<String> availableObjects, List<List<Double>> bbox, String filePath, String epsg) {
         this.fileName = fileName;
         this.fileType = fileType;
         this.availableObjects = availableObjects;
         this.bbox = bbox;
         this.filePath = filePath;
+        this.epsg = epsg;
     }
 }

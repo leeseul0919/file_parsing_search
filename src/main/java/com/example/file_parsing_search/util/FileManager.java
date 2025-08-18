@@ -6,8 +6,11 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +44,7 @@ public class FileManager {
 
     // 파일을 중간에 추가하거나 삭제할 때 쓸 수도 있어서 생성자 말고 메소드로 따로 빼놓음, 대신 처음에도 자동으로 되게끔 postconstruct로 생성자 다음으로 실행되게 해놓음  
     @PostConstruct
-    public void init() {
+    public void init() throws ParserConfigurationException, IOException, SAXException {
         log.info("파일 정보 세팅");
         List<CapabilityDto> next = new ArrayList<>();
         next = loadFiles();
@@ -49,7 +52,7 @@ public class FileManager {
         log.info("파일 로드 끝, 파일 개수: {}",fileObjects.size());
     }
 
-    private List<CapabilityDto> loadFiles() {
+    private List<CapabilityDto> loadFiles() throws ParserConfigurationException, IOException, SAXException {
         log.info("파일 로드 시작");
         List<CapabilityDto> resultFiles = new ArrayList<>();
 

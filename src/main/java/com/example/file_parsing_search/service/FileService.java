@@ -10,7 +10,10 @@ import com.example.file_parsing_search.parser.ObjectParser;
 import com.example.file_parsing_search.util.FileManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -28,7 +31,7 @@ public class FileService {
         return "Hello Spring Boot";
     }
 
-    public void fileinit() {
+    public void fileinit() throws ParserConfigurationException, IOException, SAXException {
         fileManager.init();
     }
 
