@@ -19,9 +19,7 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 @Component
 @Slf4j
@@ -38,18 +36,17 @@ public class GMLParser implements ObjectParser{
     public CapabilityDto getcapability(String filePath, String fileType) throws ParserConfigurationException, IOException, SAXException {
         String fileName = Paths.get(filePath).getFileName().toString();
 
-        List<String> objectList = new ArrayList<>();
         List<List<Double>> fileBBOX = new ArrayList<>();
 
-        // --- 파일 파싱 되었을 때 여기로 변경 ---
         String gmlFilePath = filePath;
 
+        //1. 파일 열고
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document doc = (Document) builder.parse(gmlFilePath);
         doc.getDocumentElement().normalize();  // dom tree 구조로 만들어 놓기
 
-        //2. 파일 열고 객체 목록들과 파일의 bbox 정보 가져오기
+        //2. 객체 목록들과 파일의 bbox 정보 가져오기
         //3. ObjectList, fileBBOX에 넣고
         double lowerLon = 0.0;
         double lowerLat = 0.0;
@@ -88,42 +85,21 @@ public class GMLParser implements ObjectParser{
         fileBBOX.add(upper);
 
         NodeList memberList = doc.getElementsByTagName("member");   //"member"라는 태그를 가진 모든 요소를 가져옴
+        List<String> tmpList = new ArrayList<>();
 
         for (int i=0;i< memberList.getLength();i++) {
             Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
-            NodeList children = member.getChildNodes(); // 요소 노드의 모든 하위 요소들을 가져와서
+            NodeList memberChildNodes = member.getElementsByTagName("*");
+            Element firstChild = (Element) memberChildNodes.item(0);
 
-            for (int j = 0; j < children.getLength(); j++) {
-                Node child = children.item(j);  //하나씩 보면서
-
-                if (child.getNodeType() == Node.ELEMENT_NODE) { // 그 자식 노드가 HTMLElement 요소 노드라면
-                    Element feature = (Element) child;  // element로 받아서
-                    String gmlId = feature.getAttribute("gml:id");  // 피처 객체의 "gml:id" 속성 값을 가져옴
-
-                    if (gmlId != null && !gmlId.isEmpty()) {
-                        objectList.add(gmlId);
-                        //System.out.println("Found gml:id: " + gmlId);
-                    } else {
-                        log.info("No gml:id in member " + (i+1));
-                    }
-                    break;
-                }
-            }
+            tmpList.add(firstChild.getTagName());
+            //System.out.println(firstChild.getTagName());
         }
-
-        /*
-        // --- 파서 완성 전 mock 초기값 ---
-        objectList.add("ObjectA");
-        objectList.add("ObjectB");
-        fileBBOX.add(0.0);
-        fileBBOX.add(0.0);
-        fileBBOX.add(100.0);
-        fileBBOX.add(100.0);
-        String epsg = "4326";
-         */
+        Set<String> tmpSet = new HashSet<String>(tmpList);
+        List<String> resultList = new ArrayList<>(tmpSet);
 
         String normalizedPath = filePath.replace("\\", "/");
-        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, normalizedPath,epsg);
+        return new CapabilityDto(fileType, resultList, fileBBOX, normalizedPath,epsg);
     }
 
     @Override

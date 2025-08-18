@@ -69,7 +69,7 @@ public class FileManager {
         // 확장자 맞는 것만 골라내서 CapabilityDto 객체로 만들어놓고 관리
         for (File file : files) {
             if (file.isFile()) {
-                String ext = getExtension(file.getName()).toLowerCase();
+                String ext = getExtension(file.getPath()).toLowerCase();
                 String fileType = getFileTypeByExtension(ext);
 
                 // 1차로 대상 확장자가 아닌거 거르기
@@ -106,10 +106,10 @@ public class FileManager {
         }
     }
 
-    private String getExtension(String filename) {
-        int lastDot = filename.lastIndexOf('.');
-        if (lastDot == -1 || lastDot == filename.length() - 1) return "";
-        return filename.substring(lastDot + 1);
+    private String getExtension(String filepath) {
+        int lastDot = filepath.lastIndexOf('.');
+        if (lastDot == -1 || lastDot == filepath.length() - 1) return "";
+        return filepath.substring(lastDot + 1);
     }
 
     private String getFileTypeByExtension(String ext) {

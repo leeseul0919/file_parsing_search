@@ -49,7 +49,7 @@ public class ISO8211Parser implements ObjectParser{
         epsg = "4326";
 
         String normalizedPath = filePath.replace("\\", "/");
-        return new CapabilityDto(fileName, fileType, objectList, fileBBOX, normalizedPath, epsg);
+        return new CapabilityDto(fileType, objectList, fileBBOX, normalizedPath, epsg);
     }
 
     @Override
