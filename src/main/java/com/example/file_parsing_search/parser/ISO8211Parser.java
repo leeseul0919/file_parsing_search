@@ -1,6 +1,7 @@
 package com.example.file_parsing_search.parser;
 
 import com.example.file_parsing_search.dto.CapabilityDto;
+import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,10 +64,18 @@ public class ISO8211Parser implements ObjectParser{
         //4. iso8211features에 add
 
         // --- 파서 완성 전 mock 초기값 ---
-        List<?> coordinates1 = Arrays.asList(127.0, 37.0);
-        SearchObject newobject1 = new SearchObject("feature","0000","Point",coordinates1);
-        List<?> coordinates2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
-        SearchObject newobject2 = new SearchObject("feature","0000","Polygon",coordinates2);
+        List<GeometryInfo> coordinates1 = new ArrayList<>();
+        List<?> mockpos1 =Arrays.asList(127.0276, 37.4979);
+        GeometryInfo mockinfo1 = new GeometryInfo("Point",mockpos1);
+        coordinates1.add(mockinfo1);
+        SearchObject newobject1 = new SearchObject("feature","0000",coordinates1);
+
+        List<GeometryInfo> coordinates2 = new ArrayList<>();
+        List<?> mockpos2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
+        GeometryInfo mockinfo2 = new GeometryInfo("Point",mockpos2);
+        coordinates2.add(mockinfo2);
+        SearchObject newobject2 = new SearchObject("feature","0000",coordinates2);
+
         iso8211features.add(newobject1);
         iso8211features.add(newobject2);
 

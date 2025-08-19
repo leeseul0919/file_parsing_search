@@ -80,6 +80,7 @@ public class FileController {
             long serviceEnd = System.currentTimeMillis();
             long serviceDurationMs = (long) (serviceEnd - serviceStart);
 
+            getobjectResponse.setSearchTime(serviceDurationMs);
             ResponseDto<?> responseDto = ResponseDto.success(getobjectResponse);
             String responseBodyJson = toJsonSafe(responseDto);
             LocalDateTime responseTime = LocalDateTime.now();

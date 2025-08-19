@@ -1,6 +1,7 @@
 package com.example.file_parsing_search.parser;
 
 import com.example.file_parsing_search.dto.CapabilityDto;
+import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,10 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -99,7 +104,8 @@ public class GMLParser implements ObjectParser{
     }
 
     @Override
-    public List<SearchObject> parse(GetObjectRequestDto request) throws ParserConfigurationException, IOException, SAXException {
+    public List<SearchObject> parse(GetObjectRequestDto request) throws Exception {
+        XPath xpath = XPathFactory.newInstance().newXPath();
         List<SearchObject> gmlfeatures = new ArrayList<>();
 
         //서비스 로직에서 요청이 들어온 파일 경로가 있는지 체크하고 request 넘겨주니까 그냥 그대로 request의 getFilePath 사용
@@ -120,39 +126,95 @@ public class GMLParser implements ObjectParser{
             //System.out.println(firstChild.getTagName()+": "+gmlId);
 
             NodeList geoList = member.getElementsByTagName("geometry"); //geometry 노드들을 불러서
+            List<GeometryInfo> responseGeo = new ArrayList<>();
             for(int j=0;j< geoList.getLength();j++) {
                 Element geoChild = (Element) geoList.item(j);
+                NodeList pointList = (NodeList) xpath.evaluate(".//*[local-name()='Point']", geoChild, XPathConstants.NODESET);
+                NodeList surfaceList = (NodeList) xpath.evaluate(".//*[local-name()='Surface']", geoChild, XPathConstants.NODESET);
+                NodeList polygonList = (NodeList) xpath.evaluate(".//*[local-name()='Polygon']", geoChild, XPathConstants.NODESET);
 
-                NodeList geoChildNodes = geoChild.getElementsByTagName("*");    //하위 요소 노드들을 다 불러서
-                Element geoType = (Element) geoChildNodes.item(geoChildNodes.getLength()-2);    //끝에서 두번째 네임 태그엔 객체 형식(point, linering 등)
-                Element geoInfo = (Element) geoChildNodes.item(geoChildNodes.getLength()-1);    //맨 끝에거는 객체의 위경도 정보 (pos/pos list)
-
-                String posText = geoInfo.getTextContent().trim(); // 앞뒤 공백 제거
-                String[] parts = posText.split("\\s+");
-                List<List<Double>> lonlat = new ArrayList<>();
-                for(int k=0;k<parts.length/2;k++) {
-                    double tmplon = Double.parseDouble(parts[2*k]);
-                    double tmplat = Double.parseDouble(parts[2*k+1]);
-                    List<Double> tmplonlat = List.of(tmplon,tmplat);
-                    lonlat.add(tmplonlat);
+                for(int k=0;k<pointList.getLength();k++) {
+                    Node tmpPoint = pointList.item(k);
+                    Node pointNode = (Node) xpath.evaluate(".//*[local-name()='pos']",tmpPoint,XPathConstants.NODE);
+                    List<Double> tmpP = new ArrayList<>();
+                    if(pointNode != null) {
+                        String[] coords = pointNode.getTextContent().trim().split("\\s+");
+                        tmpP.add(Double.parseDouble(coords[0]));
+                        tmpP.add(Double.parseDouble(coords[1]));
+                    }
+                    if(!tmpP.isEmpty()) {
+                        GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
+                        responseGeo.add(tmpresponse);
+                    }
                 }
-                // request에 있는 범위 안에 드는지 체크하는 조건문 추가
 
-                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,geoType.getTagName(),lonlat);
-                gmlfeatures.add(newobject);
+                for(int k=0;k<surfaceList.getLength();k++) {
+                    List<List<List<Double>>> tmpSurfaceResult = new ArrayList<>();
+                    Node tmpSurface = surfaceList.item(k);
+                    tmpSurfaceResult = surfaceFromXml(tmpSurface);
+                    if(!tmpSurfaceResult.isEmpty()) {
+                        GeometryInfo tmpresponse = new GeometryInfo("Surface",tmpSurfaceResult);
+                        responseGeo.add(tmpresponse);
+                    }
+                }
+            }
+            SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo);
+            gmlfeatures.add(newobject);
+        }
+        return gmlfeatures;
+    }
+
+    public List<List<List<Double>>> surfaceFromXml(Node node) throws Exception {
+        if(node==null || !node.hasChildNodes()) {
+            throw new IllegalArgumentException("Node is null of has no child nodes");
+        }
+        XPath xpath = XPathFactory.newInstance().newXPath();
+
+        List<List<List<Double>>> LinearRings = new ArrayList<>();
+        NodeList patchesNodes = (NodeList) xpath.evaluate(".//*[local-name()='patches']", node, XPathConstants.NODESET);
+        //List<List<Double>> LinearRings = new ArrayList<>();
+        //System.out.println("patches 개수 >> " + patchesNodes.getLength());
+        for(int i=0;i<patchesNodes.getLength();i++) {
+            Node patch = patchesNodes.item(i);
+            Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", patch, XPathConstants.NODE);
+            if(exteriorNode != null) {
+                List<List<Double>> exteriorRing = parseLinearRing(exteriorNode, xpath);
+                if (!exteriorRing.isEmpty()) LinearRings.add(exteriorRing);
+            }
+
+            NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", patch, XPathConstants.NODESET);
+            //System.out.println("interior 개수 >> " + interiorNodes.getLength());
+            for (int j = 0; j < interiorNodes.getLength(); j++) {
+                List<List<Double>> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
+                if (!interiorRing.isEmpty()) LinearRings.add(interiorRing);
             }
         }
+        return LinearRings;
+    }
 
-        /*
-        // --- 파서 완성 전 mock 초기값 ---
-        List<?> coordinates1 = Arrays.asList(127.0, 37.0);
-        SearchObject newobject1 = new SearchObject("feature","0000","Point",coordinates1);
-        List<?> coordinates2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
-        SearchObject newobject2 = new SearchObject("feature","0000","Polygon",coordinates2);
-        gmlfeatures.add(newobject1);
-        gmlfeatures.add(newobject2);
-         */
+    private List<List<Double>> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
+        Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
+        List<List<Double>> coordinates = new ArrayList<>();
 
-        return gmlfeatures;
+        if (posListNode != null) {
+            String[] tokens = posListNode.getTextContent().trim().split("\\s+");
+            //System.out.println(posListNode.getTextContent());
+            for (int i = 0; i < tokens.length; i += 2) {
+                List<Double> tmppos = new ArrayList<>();
+                tmppos.add(Double.parseDouble(tokens[i]));
+                tmppos.add(Double.parseDouble(tokens[i + 1]));
+                coordinates.add(tmppos);
+            }
+        } else {
+            NodeList posNodes = (NodeList) xpath.evaluate(".//*[local-name()='pos']", ringNode, XPathConstants.NODESET);
+            for (int i = 0; i < posNodes.getLength(); i++) {
+                String[] coords = posNodes.item(i).getTextContent().trim().split("\\s+");
+                List<Double> coord = new ArrayList<>();
+                coord.add(Double.parseDouble(coords[0]));
+                coord.add(Double.parseDouble(coords[1]));
+                coordinates.add(coord);
+            }
+        }
+        return coordinates;
     }
 }

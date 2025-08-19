@@ -39,7 +39,7 @@ public class FileService {
         return fileManager.capabilityResponse();
     }
 
-    public GetObjectResponseDto getObjectResponseDto(GetObjectRequestDto request) throws ParserConfigurationException, IOException, SAXException {
+    public GetObjectResponseDto getObjectResponseDto(GetObjectRequestDto request) throws Exception {
         GetObjectResponseDto responsedto = new GetObjectResponseDto();
 
         //1. 파일명 받은걸로 파일 정보 불러오고
