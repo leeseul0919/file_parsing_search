@@ -157,6 +157,17 @@ public class GMLParser implements ObjectParser{
                         responseGeo.add(tmpresponse);
                     }
                 }
+
+                for(int k=0;k<polygonList.getLength();k++) {
+                    List<List<List<Double>>> tmpPolygonResult = new ArrayList<>();
+                    Node tmpSurface = polygonList.item(k);
+                    tmpPolygonResult = polygonFromXml(tmpSurface);
+                    if(!tmpPolygonResult.isEmpty()) {
+                        System.out.println("polygon input");
+                        GeometryInfo tmpresponse = new GeometryInfo("Polygon",tmpPolygonResult);
+                        responseGeo.add(tmpresponse);
+                    }
+                }
             }
             SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo);
             gmlfeatures.add(newobject);
@@ -192,8 +203,36 @@ public class GMLParser implements ObjectParser{
         return LinearRings;
     }
 
+    public List<List<List<Double>>> polygonFromXml(Node node) throws Exception {
+        if(node==null || !node.hasChildNodes()) {
+            throw new IllegalArgumentException("Node is null of has no child nodes");
+        }
+        XPath xpath = XPathFactory.newInstance().newXPath();
+
+        List<List<List<Double>>> LinearRings = new ArrayList<>();
+        //NodeList patchesNodes = (NodeList) xpath.evaluate(".//*[local-name()='patches']", node, XPathConstants.NODESET);
+        //List<List<Double>> LinearRings = new ArrayList<>();
+        //System.out.println("patches 개수 >> " + patchesNodes.getLength());
+        Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", node, XPathConstants.NODE);
+        if(exteriorNode != null) {
+            List<List<Double>> exteriorRing = parseLinearRing(exteriorNode, xpath);
+            if (!exteriorRing.isEmpty()) LinearRings.add(exteriorRing);
+        }
+
+        NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", node, XPathConstants.NODESET);
+        System.out.println("interior 개수 >> " + interiorNodes.getLength());
+        for (int j = 0; j < interiorNodes.getLength(); j++) {
+            List<List<Double>> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
+            if (!interiorRing.isEmpty()) LinearRings.add(interiorRing);
+        }
+
+        return LinearRings;
+    }
+
     private List<List<Double>> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
+        //coordinates는 첫번째 if문, coordinate는 else 과정 이것도 포함시킬까?
         Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
+        Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
         List<List<Double>> coordinates = new ArrayList<>();
 
         if (posListNode != null) {
@@ -205,7 +244,18 @@ public class GMLParser implements ObjectParser{
                 tmppos.add(Double.parseDouble(tokens[i + 1]));
                 coordinates.add(tmppos);
             }
-        } else {
+        } else if (coordinatesListNode != null) {
+            String[] tokens = coordinatesListNode.getTextContent().trim().split("\\s+");
+            //System.out.println(posListNode.getTextContent());
+            for (String token:tokens) {
+                String[] xy = token.split(",");
+                List<Double> tmppos = new ArrayList<>();
+                tmppos.add(Double.parseDouble(xy[0]));
+                tmppos.add(Double.parseDouble(xy[1]));
+                coordinates.add(tmppos);
+            }
+        }
+        else {
             NodeList posNodes = (NodeList) xpath.evaluate(".//*[local-name()='pos']", ringNode, XPathConstants.NODESET);
             for (int i = 0; i < posNodes.getLength(); i++) {
                 String[] coords = posNodes.item(i).getTextContent().trim().split("\\s+");
