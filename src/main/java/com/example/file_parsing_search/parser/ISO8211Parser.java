@@ -4,9 +4,11 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
+import org.locationtech.jts.geom.Polygon;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.awt.*;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,7 +56,7 @@ public class ISO8211Parser implements ObjectParser{
     }
 
     @Override
-    public List<SearchObject> parse(GetObjectRequestDto request) {
+    public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
         List<SearchObject> iso8211features = new ArrayList<>();
 
         // --- 파일 파싱 되었을 때 여기로 변경 ---

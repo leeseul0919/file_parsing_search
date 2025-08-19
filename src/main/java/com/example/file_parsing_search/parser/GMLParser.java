@@ -5,6 +5,7 @@ import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
 import lombok.extern.slf4j.Slf4j;
+import org.locationtech.jts.geom.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -104,7 +105,8 @@ public class GMLParser implements ObjectParser{
     }
 
     @Override
-    public List<SearchObject> parse(GetObjectRequestDto request) throws Exception {
+    public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
+        GeometryFactory gf = new GeometryFactory();
         XPath xpath = XPathFactory.newInstance().newXPath();
         List<SearchObject> gmlfeatures = new ArrayList<>();
 
@@ -123,7 +125,6 @@ public class GMLParser implements ObjectParser{
             NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
             Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
             String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
-            //System.out.println(firstChild.getTagName()+": "+gmlId);
 
             NodeList geoList = member.getElementsByTagName("geometry"); //geometry 노드들을 불러서
             List<GeometryInfo> responseGeo = new ArrayList<>();
@@ -139,8 +140,11 @@ public class GMLParser implements ObjectParser{
                     List<Double> tmpP = new ArrayList<>();
                     if(pointNode != null) {
                         String[] coords = pointNode.getTextContent().trim().split("\\s+");
-                        tmpP.add(Double.parseDouble(coords[0]));
-                        tmpP.add(Double.parseDouble(coords[1]));
+                        Point p = gf.createPoint(new Coordinate(Double.parseDouble(coords[0]), Double.parseDouble(coords[1])));
+                        if(polygon.contains(p)) {
+                            tmpP.add(Double.parseDouble(coords[0]));
+                            tmpP.add(Double.parseDouble(coords[1]));
+                        }
                     }
                     if(!tmpP.isEmpty()) {
                         GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
@@ -151,7 +155,7 @@ public class GMLParser implements ObjectParser{
                 for(int k=0;k<surfaceList.getLength();k++) {
                     List<List<List<Double>>> tmpSurfaceResult = new ArrayList<>();
                     Node tmpSurface = surfaceList.item(k);
-                    tmpSurfaceResult = surfaceFromXml(tmpSurface);
+                    tmpSurfaceResult = surfaceFromXml(tmpSurface,polygon);
                     if(!tmpSurfaceResult.isEmpty()) {
                         GeometryInfo tmpresponse = new GeometryInfo("Surface",tmpSurfaceResult);
                         responseGeo.add(tmpresponse);
@@ -169,13 +173,16 @@ public class GMLParser implements ObjectParser{
                     }
                 }
             }
-            SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo);
-            gmlfeatures.add(newobject);
+            if(!responseGeo.isEmpty()) {
+                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo);
+                gmlfeatures.add(newobject);
+            }
         }
         return gmlfeatures;
     }
 
-    public List<List<List<Double>>> surfaceFromXml(Node node) throws Exception {
+    public List<List<List<Double>>> surfaceFromXml(Node node, Polygon polygon) throws Exception {
+        GeometryFactory gf = new GeometryFactory();
         if(node==null || !node.hasChildNodes()) {
             throw new IllegalArgumentException("Node is null of has no child nodes");
         }
@@ -183,21 +190,23 @@ public class GMLParser implements ObjectParser{
 
         List<List<List<Double>>> LinearRings = new ArrayList<>();
         NodeList patchesNodes = (NodeList) xpath.evaluate(".//*[local-name()='patches']", node, XPathConstants.NODESET);
-        //List<List<Double>> LinearRings = new ArrayList<>();
-        //System.out.println("patches 개수 >> " + patchesNodes.getLength());
         for(int i=0;i<patchesNodes.getLength();i++) {
             Node patch = patchesNodes.item(i);
             Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", patch, XPathConstants.NODE);
             if(exteriorNode != null) {
                 List<List<Double>> exteriorRing = parseLinearRing(exteriorNode, xpath);
-                if (!exteriorRing.isEmpty()) LinearRings.add(exteriorRing);
-            }
+                Polygon tempPolygon = createPolygon(exteriorRing);
+                if (polygon.intersects(tempPolygon) && !exteriorRing.isEmpty()) {
+                    LinearRings.add(exteriorRing);
 
-            NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", patch, XPathConstants.NODESET);
-            //System.out.println("interior 개수 >> " + interiorNodes.getLength());
-            for (int j = 0; j < interiorNodes.getLength(); j++) {
-                List<List<Double>> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
-                if (!interiorRing.isEmpty()) LinearRings.add(interiorRing);
+                    NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", patch, XPathConstants.NODESET);
+                    for (int j = 0; j < interiorNodes.getLength(); j++) {
+                        List<List<Double>> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
+                        if (!interiorRing.isEmpty()) LinearRings.add(interiorRing);
+                    }
+                }
+            } else {
+                continue;
             }
         }
         return LinearRings;
@@ -210,9 +219,6 @@ public class GMLParser implements ObjectParser{
         XPath xpath = XPathFactory.newInstance().newXPath();
 
         List<List<List<Double>>> LinearRings = new ArrayList<>();
-        //NodeList patchesNodes = (NodeList) xpath.evaluate(".//*[local-name()='patches']", node, XPathConstants.NODESET);
-        //List<List<Double>> LinearRings = new ArrayList<>();
-        //System.out.println("patches 개수 >> " + patchesNodes.getLength());
         Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", node, XPathConstants.NODE);
         if(exteriorNode != null) {
             List<List<Double>> exteriorRing = parseLinearRing(exteriorNode, xpath);
@@ -230,7 +236,6 @@ public class GMLParser implements ObjectParser{
     }
 
     private List<List<Double>> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
-        //coordinates는 첫번째 if문, coordinate는 else 과정 이것도 포함시킬까?
         Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
         Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
         List<List<Double>> coordinates = new ArrayList<>();
@@ -266,5 +271,16 @@ public class GMLParser implements ObjectParser{
             }
         }
         return coordinates;
+    }
+
+    public Polygon createPolygon(List<List<Double>> coords) {
+        GeometryFactory gf = new GeometryFactory();
+        Coordinate[] coordinates = new Coordinate[coords.size()];
+        for (int i = 0; i < coords.size(); i++) {
+            List<Double> c = coords.get(i);
+            coordinates[i] = new Coordinate(c.get(0), c.get(1));
+        }
+        LinearRing shell = gf.createLinearRing(coordinates);
+        return gf.createPolygon(shell, null);   //테두리랑 안에 비어있는 구멍들 정보, 구멍이 없다면 그냥 null
     }
 }
