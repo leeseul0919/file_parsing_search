@@ -4,21 +4,39 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
+import com.fasterxml.jackson.core.util.Separators;
 import io.jhdf.HdfFile;
 import io.jhdf.api.Attribute;
+import io.jhdf.api.Dataset;
 import io.jhdf.api.Group;
 import io.jhdf.api.Node;
+import io.jhdf.object.datatype.CompoundDataType;
+import io.jhdf.object.datatype.DataType;
+import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Polygon;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.lang.model.util.Elements;
 import java.awt.*;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 
 @Component
+@Slf4j
 public class HDF5Parser implements ObjectParser{
+    private final Map<Integer, String> dataCodingFormats = new HashMap<>() {{
+        put(1, "fixed stations");
+        put(2, "Regular Grid");
+        put(3, "Ungeorectified Grid");
+        put(4, "Moving Platform");
+        put(5, "Irregular Grid");
+        put(6, "Variable cell size");
+        put(7, "TIN");
+        put(8, "fixed stations (Stationwise)");
+    }};
+
     @Value("${file.upload-dir}")
     private String uploadDir;
 
@@ -78,28 +96,163 @@ public class HDF5Parser implements ObjectParser{
     @Override
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
         List<SearchObject> hdf5features = new ArrayList<>();
-
+        String hdf5FilePath = request.getFilePath();
         // --- 파일 파싱 되었을 때 여기로 변경 ---
+        try (HdfFile hdfFile = new HdfFile(Paths.get(hdf5FilePath))) {
+            for(Node node: hdfFile) {
+                if (node instanceof Group && !node.getName().equalsIgnoreCase("Group_F")) {
+                    Group objectGroup = (Group) node;
+                    String objectType = objectGroup.getName();
+
+                    // Step 2: dataCodingFormat 속성 값 가져오기
+                    Map<String, Object> attributes = printAttributes(objectGroup); // 가정된 메서드
+                    Object codingFormatAttr = getIgnoreCase(attributes, "dataCodingFormat");
+
+                    if (codingFormatAttr != null) {
+                        String tmpformat = codingFormatAttr.toString();
+                        int format = Integer.parseInt(tmpformat);
+
+                        for (Node subNode : objectGroup) {
+                            if (subNode instanceof Group) {
+                                Group dataObject = (Group) subNode;
+                                String objectId = dataObject.getName();
+                                Map<String, Object> subGroupAttr = new HashMap<>();
+                                List<GeometryInfo> responseGeo = new ArrayList<>();
+                                GeometryInfo tmpGeo = new GeometryInfo();
+
+                                switch(format) {
+                                    case 1:
+                                        //System.out.println(objectId + " (coding format: " + format + ")");
+                                        // parsing, extract geo info
+                                        subGroupAttr = printAttributes(subNode);
+                                        Object numStationsObj = getIgnoreCase(subGroupAttr, "numberOfStations");
+                                        if (numStationsObj != null) {
+                                            String numStationsStr = numStationsObj.toString();
+                                            int numStations = Integer.parseInt(numStationsStr);
+                                            List<List<Double>> stationCoordinates = new ArrayList<>();
+
+                                            // 하위 그룹 중에 데이터셋의 컬럼이 Latitude, Longitude로 이루어져 있는 그룹을 찾고
+                                            for(Node geoNode:dataObject) {
+                                                if(geoNode instanceof Group) {
+                                                    Group geoGroup = (Group) geoNode;
+                                                    for(Node datasetNode:geoGroup) {
+                                                        if(datasetNode instanceof Dataset) {
+                                                            Dataset coordinatesDataset = (Dataset) datasetNode;
+                                                            DataType fieldNames = coordinatesDataset.getDataType();
+                                                            boolean hasLon = false;
+                                                            boolean hasLat = false;
+                                                            String lonKey = null;
+                                                            String latKey = null;
+
+                                                            if(fieldNames instanceof CompoundDataType) {
+                                                                String tmplon = null;
+                                                                String tmplat = null;
+
+                                                                CompoundDataType compoundDataType = (CompoundDataType) fieldNames;
+                                                                List<CompoundDataType.CompoundDataMember> members = compoundDataType.getMembers();
+                                                                for(CompoundDataType.CompoundDataMember member:members) {
+                                                                    String memberName = member.getName();
+                                                                    if(memberName.equalsIgnoreCase("longitude")) {
+                                                                        hasLon=true;
+                                                                        tmplon = memberName;
+                                                                    }
+                                                                    if(memberName.equalsIgnoreCase("latitude")) {
+                                                                        hasLat=true;
+                                                                        tmplat = memberName;
+                                                                    }
+                                                                }
+                                                                if(tmplon != null) lonKey = tmplon;
+                                                                if(tmplat != null) latKey = tmplat;
+                                                            }
+                                                            if(coordinatesDataset.getDimensions()[0] == numStations && hasLat && hasLon) {
+                                                                try {
+                                                                    Map<String, Object> rawData = (Map<String, Object>) coordinatesDataset.getData();
+                                                                    Object lonArr = rawData.get(lonKey);
+                                                                    Object latArr = rawData.get(latKey);
+                                                                    float[] longitudes = (float[]) lonArr;
+                                                                    float[] latitudes = (float[]) latArr;
+                                                                    for (int i = 0; i < numStations; i++) {
+                                                                        stationCoordinates.add(List.of((double) longitudes[i], (double) latitudes[i]));
+                                                                    }
+                                                                    break;
+                                                                } catch (Exception e) {
+                                                                    log.error("Failed to parse coordinates dataset: " + e.getMessage());
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // numStations 만큼 (lat, lon) 쌍을 추출해서
+                                            // List<List<Double>>에 넣기
+                                            //System.out.println("Object Type: " + objectType);
+                                            //System.out.println("Object Id: " + objectId);
+                                            //System.out.println("Object Geo Type: " + dataCodingFormats.get(format));
+                                            //System.out.println("Object Geo Coordinates: " + stationCoordinates);
+
+                                            tmpGeo.setType(dataCodingFormats.get(format));
+                                            tmpGeo.setCoordinates(stationCoordinates);
+                                            responseGeo.add(tmpGeo);
+                                            //hdf5features
+                                        }
+                                        break;
+                                    case 2:
+                                        //System.out.println(objectId + " (coding format: " + format + ")");
+                                        // parsing, extract geo info
+                                        subGroupAttr = printAttributes(subNode);
+                                        Object gridOriginLatObj = getIgnoreCase(subGroupAttr, "gridOriginLatitude");
+                                        Object gridOriginLonObj = getIgnoreCase(subGroupAttr, "gridOriginLongitude");
+                                        Object gridSpacingLatObj = getIgnoreCase(subGroupAttr, "gridSpacingLatitudinal");
+                                        Object gridSpacingLonObj = getIgnoreCase(subGroupAttr, "gridSpacingLongitudinal");
+                                        if(gridOriginLatObj!=null && gridOriginLonObj!=null && gridSpacingLatObj!=null && gridSpacingLonObj!=null) {
+                                            String gridOriginLatStr = gridOriginLatObj.toString();
+                                            String gridOriginLonStr = gridOriginLonObj.toString();
+                                            String gridSpacingLatStr = gridSpacingLatObj.toString();
+                                            String gridSpacingLonStr = gridSpacingLonObj.toString();
+
+                                            Double gridOriginLat = Double.parseDouble(gridOriginLatStr);
+                                            Double gridOriginLon = Double.parseDouble(gridOriginLonStr);
+                                            Double gridSpacingLat = Double.parseDouble(gridSpacingLatStr);
+                                            Double gridSpacingLon = Double.parseDouble(gridSpacingLonStr);
+
+                                            //System.out.println("Object Type: " + objectType);
+                                            //System.out.println("Object Id: " + objectId);
+                                            //System.out.println("Object Geo Type: " + dataCodingFormats.get(format));
+                                            //System.out.println("Object Geo Coordinates: (" + gridOriginLat + ", " + gridOriginLon + ") ,(" + gridSpacingLat + ", " + gridSpacingLon + ")");
+
+                                            List<Double> OriginLatLon = List.of(gridOriginLat,gridOriginLon);
+                                            List<Double> SpacingLatLon = List.of(gridSpacingLat,gridSpacingLon);
+                                            List<List<Double>> tmpGridGeo = List.of(OriginLatLon,SpacingLatLon);
+                                            tmpGeo.setType(dataCodingFormats.get(format));
+                                            tmpGeo.setCoordinates(tmpGridGeo);
+                                            responseGeo.add(tmpGeo);
+                                        }
+                                        break;
+                                    case 3:
+                                    case 4:
+                                    case 5:
+                                    case 6:
+                                    case 7:
+                                    case 8:
+                                    default:
+                                        log.error("지원하지 않는 Coding Format입니다: " + objectId);
+                                        break;
+                                }
+                                SearchObject tmpSearchObj = new SearchObject(objectType,objectId,responseGeo);
+                                hdf5features.add(tmpSearchObj);
+                            }
+                        }
+                    }
+                }
+
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         //1. System.getProperty("user.dir") + "/uploads" + "/iso8211/" + fileInfo.getFilePath()으로 접근해서 파일 로드
         //2. request.getGeometry().getGeoType(), request.getGeometry().getCoordinates() 으로 파일에 사용자가 요청한 범위 계산
         //3. 해당 범위 안에 있는 객체들 탐색, 한 객체에 대해 GeoJson 표준에 들어가는 정보들 뽑아서 SearchObject객체로 만들고
         //4. iso8211features에 add
-
-        // --- 파서 완성 전 mock 초기값 ---
-        List<GeometryInfo> coordinates1 = new ArrayList<>();
-        List<?> mockpos1 =Arrays.asList(127.0276, 37.4979);
-        GeometryInfo mockinfo1 = new GeometryInfo("Point",mockpos1);
-        coordinates1.add(mockinfo1);
-        SearchObject newobject1 = new SearchObject("feature","0000",coordinates1);
-
-        List<GeometryInfo> coordinates2 = new ArrayList<>();
-        List<?> mockpos2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
-        GeometryInfo mockinfo2 = new GeometryInfo("Point",mockpos2);
-        coordinates2.add(mockinfo2);
-        SearchObject newobject2 = new SearchObject("feature","0000",coordinates2);
-
-        hdf5features.add(newobject1);
-        hdf5features.add(newobject2);
 
         return hdf5features;
     }
