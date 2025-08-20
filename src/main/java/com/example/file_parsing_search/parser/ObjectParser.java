@@ -14,6 +14,6 @@ import java.util.List;
 
 public interface ObjectParser {
     String getSupportedFileType();
-    CapabilityDto getcapability(String filePath, String fileType) throws ParserConfigurationException, IOException, SAXException;
+    CapabilityDto getcapability(String filePath, String fileType) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException;
     List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception;  //GetObject 작업
 }

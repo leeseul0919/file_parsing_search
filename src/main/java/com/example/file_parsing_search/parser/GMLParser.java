@@ -39,8 +39,9 @@ public class GMLParser implements ObjectParser{
     }
 
     @Override
-    public CapabilityDto getcapability(String filePath, String fileType) throws ParserConfigurationException, IOException, SAXException {
+    public CapabilityDto getcapability(String filePath, String fileType) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {
         String fileName = Paths.get(filePath).getFileName().toString();
+        XPath xpath = XPathFactory.newInstance().newXPath();
 
         List<List<Double>> fileBBOX = new ArrayList<>();
 
@@ -60,12 +61,13 @@ public class GMLParser implements ObjectParser{
         double upperLat = 0.0;
         String epsg = "";
 
-        NodeList bboxInfo = doc.getElementsByTagName("gml:boundedBy");
-        if (bboxInfo.getLength() > 0) {
-            Element boundedBy = (Element) bboxInfo.item(0); // gml:boundedBy는 한개니까 item(0)으로 요소 노드로 가져와서
+        Element root = doc.getDocumentElement();
+        NodeList bboxInfo = (NodeList) xpath.evaluate(".//*[local-name()='boundedBy']", root, XPathConstants.NODESET);
+        if (bboxInfo.getLength() == 1) {
+            Element boundedBy = (Element) bboxInfo.item(0); // boundedBy는 한개니까 item(0)으로 요소 노드로 가져와서
 
-            NodeList envelopeList = boundedBy.getElementsByTagName("gml:Envelope"); // 이 요소 노드의 gml:Envelope 태그로 가져와서
-            if (envelopeList.getLength() > 0) {
+            NodeList envelopeList = (NodeList) xpath.evaluate(".//*[local-name()='Envelope']", boundedBy, XPathConstants.NODESET); // 이 요소 노드의 gml:Envelope 태그로 가져와서
+            if (envelopeList.getLength() == 1) {
                 Element envelope = (Element) envelopeList.item(0);  // gml:Envelope도 한개니까 item(0)으로 element로 가져와서
 
                 //각 정보에 해당하는 태그로 추출하기
@@ -73,12 +75,16 @@ public class GMLParser implements ObjectParser{
                 String[] srsnameSplit = srsName.split(":");
                 epsg = srsnameSplit[srsnameSplit.length - 1];
 
-                String[] lower = envelope.getElementsByTagName("gml:lowerCorner").item(0).getTextContent().split(" ");
-                lowerLon = Double.parseDouble(lower[0]);
-                lowerLat = Double.parseDouble(lower[1]);
-                String[] upper = envelope.getElementsByTagName("gml:upperCorner").item(0).getTextContent().split(" ");
-                upperLon = Double.parseDouble(upper[0]);
-                upperLat = Double.parseDouble(upper[1]);
+                Node nodeLower = (Node) xpath.evaluate(".//*[local-name()='lowerCorner']",envelope,XPathConstants.NODE);
+                Node nodeUpper = (Node) xpath.evaluate(".//*[local-name()='upperCorner']",envelope,XPathConstants.NODE);
+                if(nodeLower != null && nodeUpper != null) {
+                    String[] lower = nodeLower.getTextContent().trim().split(" ");
+                    lowerLon = Double.parseDouble(lower[0]);
+                    lowerLat = Double.parseDouble(lower[1]);
+                    String[] upper = nodeUpper.getTextContent().trim().split(" ");
+                    upperLon = Double.parseDouble(upper[0]);
+                    upperLat = Double.parseDouble(upper[1]);
+                }
             }
         }
         List<Double> lower = List.of(lowerLon,lowerLat);
@@ -86,16 +92,17 @@ public class GMLParser implements ObjectParser{
         fileBBOX.add(lower);
         fileBBOX.add(upper);
 
-        NodeList memberList = doc.getElementsByTagName("member");   //"member"라는 태그를 가진 모든 요소를 가져옴
+        NodeList memberList = (NodeList) xpath.evaluate(".//*[local-name()='member']", doc, XPathConstants.NODESET);   //"member"라는 태그를 가진 모든 요소를 가져옴
         List<String> tmpList = new ArrayList<>();
 
         for (int i=0;i< memberList.getLength();i++) {
-            Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
-            NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
-            Element firstChild = (Element) memberChildNodes.item(0);    //그 중에서 가장 앞에 있는 노드가 객체 타입 정의
+            if(memberList.item(i).getNodeType() == Node.ELEMENT_NODE) {
+                Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
+                NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
+                Element firstChild = (Element) memberChildNodes.item(0);    //그 중에서 가장 앞에 있는 노드가 객체 타입 정의
 
-            tmpList.add(firstChild.getTagName());   //태그 이름을 집어넣기
-            //System.out.println(firstChild.getTagName());
+                tmpList.add(firstChild.getTagName());   //태그 이름을 집어넣기
+            }
         }
         Set<String> tmpSet = new HashSet<String>(tmpList);  //객체 종류 목록이니까 중복 제거해서
         List<String> resultList = new ArrayList<>(tmpSet);
@@ -118,7 +125,8 @@ public class GMLParser implements ObjectParser{
         Document doc = (Document) builder.parse(gmlFilePath);
         doc.getDocumentElement().normalize();   //모든 요소들을 dom tree 구조로 만들어 두고
 
-        NodeList memberList = doc.getElementsByTagName("member");
+        NodeList memberList = (NodeList) xpath.evaluate(".//*[local-name()='member']", doc, XPathConstants.NODESET);
+        log.info("member: " + memberList.getLength());
         for (int i=0;i< memberList.getLength();i++) {
             Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
 
@@ -126,7 +134,7 @@ public class GMLParser implements ObjectParser{
             Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
             String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
 
-            NodeList geoList = member.getElementsByTagName("geometry"); //geometry 노드들을 불러서
+            NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
             List<GeometryInfo> responseGeo = new ArrayList<>();
             for(int j=0;j< geoList.getLength();j++) {
                 Element geoChild = (Element) geoList.item(j);
@@ -178,6 +186,7 @@ public class GMLParser implements ObjectParser{
                 gmlfeatures.add(newobject);
             }
         }
+        log.info("total: " + gmlfeatures.size());
         return gmlfeatures;
     }
 

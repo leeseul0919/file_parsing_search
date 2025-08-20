@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathExpressionException;
 import java.io.IOException;
 import java.util.List;
 
@@ -35,7 +36,7 @@ public class FileService {
         return "Hello Spring Boot";
     }
 
-    public void fileinit() throws ParserConfigurationException, IOException, SAXException {
+    public void fileinit() throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {
         fileManager.init();
     }
 

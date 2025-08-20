@@ -4,14 +4,17 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
+import io.jhdf.HdfFile;
+import io.jhdf.api.Attribute;
+import io.jhdf.api.Group;
+import io.jhdf.api.Node;
 import org.locationtech.jts.geom.Polygon;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.List;
 
 @Component
@@ -30,30 +33,46 @@ public class HDF5Parser implements ObjectParser{
 
         List<String> objectList = new ArrayList<>();
         List<List<Double>> fileBBOX = new ArrayList<>();
-        double lowerLon = 0.0;
-        double lowerLat = 0.0;
-        double upperLon = 0.0;
-        double upperLat = 0.0;
+        String westbbox = "0.0";
+        String southbbox = "0.0";
+        String eastbbox = "0.0";
+        String northbbox = "0.0";
         String epsg = "";
 
-
         // --- 파일 파싱 되었을 때 여기로 변경 ---
-        //1. 전달받은 filePath로 접근
-        //2. 파일 열고 객체 목록들과 파일의 bbox 정보 가져오기
-        //3. ObjectList, fileBBOX에 넣고
-        //4. Map으로 묶은뒤 반환
+        try (HdfFile hdfFile = new HdfFile(Paths.get(filePath))) {
+            Map<String, Object> fileAttr = printAttributes(hdfFile);
 
-        // --- 파서 완성 전 mock 초기값 ---
-        objectList.add("ObjectA");
-        objectList.add("ObjectB");
-        List<Double> lower = List.of(lowerLon,lowerLat);
-        List<Double> upper = List.of(upperLon,upperLat);
-        fileBBOX.add(lower);
-        fileBBOX.add(upper);
-        epsg = "4326";
+            Object objectEPSG = getIgnoreCase(fileAttr, "horizontalDatumValue");
+            Object objectwest = getIgnoreCase(fileAttr, "westBoundLongitude");
+            Object objectsouth = getIgnoreCase(fileAttr, "southBoundLatitude");
+            Object objecteast = getIgnoreCase(fileAttr, "eastBoundLongitude");
+            Object objectnorth = getIgnoreCase(fileAttr, "northBoundLatitude");
+            if(objectEPSG != null) epsg = objectEPSG.toString();
+            if(objectwest != null) westbbox = objectwest.toString();
+            if(objectsouth != null) southbbox = objectsouth.toString();
+            if(objecteast != null) eastbbox = objecteast.toString();
+            if(objectnorth != null) northbbox = objectnorth.toString();
+            List<Double> lowerCorner = List.of(Double.parseDouble(westbbox),Double.parseDouble(southbbox));
+            List<Double> upperCorner = List.of(Double.parseDouble(eastbbox),Double.parseDouble(northbbox));
+            fileBBOX.add(lowerCorner);
+            fileBBOX.add(upperCorner);
 
-        String normalizedPath = filePath.replace("\\", "/");
-        return new CapabilityDto(fileType, objectList, fileBBOX, normalizedPath, epsg);
+            for(Node node: hdfFile) {
+                if(node instanceof Group) {
+                    Group tmpGroup = (Group) node;
+                    if(!tmpGroup.getName().equalsIgnoreCase("Group_F")) objectList.add(tmpGroup.getName());
+                }
+            }
+            Set<String> tmpSet = new HashSet<String>(objectList);
+            List<String> resultList = new ArrayList<>(tmpSet);
+
+            String normalizedPath = filePath.replace("\\", "/");
+            return new CapabilityDto(fileType, resultList, fileBBOX, normalizedPath, epsg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     @Override
@@ -83,5 +102,27 @@ public class HDF5Parser implements ObjectParser{
         hdf5features.add(newobject2);
 
         return hdf5features;
+    }
+
+    public static Object getIgnoreCase(Map<String, Object> map, String key) {
+        for (String k : map.keySet()) {
+            if (k.equalsIgnoreCase(key)) {
+                return map.get(k);
+            }
+        }
+        return null;
+    }
+    private static Map<String, Object> printAttributes(Node node) {
+        Map<String, Object> resultAttr = new HashMap<>();
+        Map<String, Attribute> attrs = node.getAttributes();
+        for (Map.Entry<String, Attribute> entry : attrs.entrySet()) {
+            String attrName = entry.getKey();
+            Attribute attr = entry.getValue();
+            Object value = attr.getData();  // getValue()가 아니라 getData()임
+            resultAttr.put(attrName,value);
+//
+            //System.out.println("    [Attribute] " + attrName + " = " + value);
+        }
+        return resultAttr;
     }
 }
