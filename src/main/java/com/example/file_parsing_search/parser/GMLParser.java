@@ -118,7 +118,7 @@ public class GMLParser implements ObjectParser{
         List<SearchObject> gmlfeatures = new ArrayList<>();
 
         //서비스 로직에서 요청이 들어온 파일 경로가 있는지 체크하고 request 넘겨주니까 그냥 그대로 request의 getFilePath 사용
-        String gmlFilePath = request.getFilePath();
+        String gmlFilePath = request.getFilePath().replace("\\", "/");
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
@@ -133,14 +133,19 @@ public class GMLParser implements ObjectParser{
             NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
             Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
             String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
+            log.info("gml:id >>" + gmlId);
 
             NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
+            log.info("gml geometry >> "+geoList.getLength());
             List<GeometryInfo> responseGeo = new ArrayList<>();
             for(int j=0;j< geoList.getLength();j++) {
                 Element geoChild = (Element) geoList.item(j);
                 NodeList pointList = (NodeList) xpath.evaluate(".//*[local-name()='Point']", geoChild, XPathConstants.NODESET);
                 NodeList surfaceList = (NodeList) xpath.evaluate(".//*[local-name()='Surface']", geoChild, XPathConstants.NODESET);
                 NodeList polygonList = (NodeList) xpath.evaluate(".//*[local-name()='Polygon']", geoChild, XPathConstants.NODESET);
+                log.info("Point >> " + pointList.getLength());
+                log.info("Surface >> " + surfaceList.getLength());
+                log.info("Polygon >> " + polygonList.getLength());
 
                 for(int k=0;k<pointList.getLength();k++) {
                     Node tmpPoint = pointList.item(k);

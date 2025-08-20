@@ -96,7 +96,7 @@ public class HDF5Parser implements ObjectParser{
     @Override
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
         List<SearchObject> hdf5features = new ArrayList<>();
-        String hdf5FilePath = request.getFilePath();
+        String hdf5FilePath = request.getFilePath().replace("\\", "/");;
         // --- 파일 파싱 되었을 때 여기로 변경 ---
         try (HdfFile hdfFile = new HdfFile(Paths.get(hdf5FilePath))) {
             for(Node node: hdfFile) {
