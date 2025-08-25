@@ -72,8 +72,7 @@ public class GMLParser implements ObjectParser{
 
                 //각 정보에 해당하는 태그로 추출하기
                 String srsName = envelope.getAttribute("srsName");
-                String[] srsnameSplit = srsName.split(":");
-                epsg = srsnameSplit[srsnameSplit.length - 1];
+                epsg = srsName;
 
                 Node nodeLower = (Node) xpath.evaluate(".//*[local-name()='lowerCorner']",envelope,XPathConstants.NODE);
                 Node nodeUpper = (Node) xpath.evaluate(".//*[local-name()='upperCorner']",envelope,XPathConstants.NODE);
@@ -187,7 +186,7 @@ public class GMLParser implements ObjectParser{
                 }
             }
             if(!responseGeo.isEmpty()) {
-                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo);
+                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo,null);
                 gmlfeatures.add(newobject);
             }
         }

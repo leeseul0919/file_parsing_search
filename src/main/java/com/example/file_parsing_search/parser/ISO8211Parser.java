@@ -70,13 +70,13 @@ public class ISO8211Parser implements ObjectParser{
         List<?> mockpos1 =Arrays.asList(127.0276, 37.4979);
         GeometryInfo mockinfo1 = new GeometryInfo("Point",mockpos1);
         coordinates1.add(mockinfo1);
-        SearchObject newobject1 = new SearchObject("feature","0000",coordinates1);
+        SearchObject newobject1 = new SearchObject("feature","0000",coordinates1,null);
 
         List<GeometryInfo> coordinates2 = new ArrayList<>();
         List<?> mockpos2 = Arrays.asList(Arrays.asList(127.0276, 37.4979), Arrays.asList(127.0286, 37.4979), Arrays.asList(127.0286, 37.4989), Arrays.asList(127.0276, 37.4989), Arrays.asList(127.0276, 37.4979));
         GeometryInfo mockinfo2 = new GeometryInfo("Point",mockpos2);
         coordinates2.add(mockinfo2);
-        SearchObject newobject2 = new SearchObject("feature","0000",coordinates2);
+        SearchObject newobject2 = new SearchObject("feature","0000",coordinates2,null);
 
         iso8211features.add(newobject1);
         iso8211features.add(newobject2);

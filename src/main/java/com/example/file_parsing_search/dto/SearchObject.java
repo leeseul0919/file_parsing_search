@@ -15,14 +15,16 @@ public class SearchObject {
     private String type;
     private String id;
     private List<GeometryInfo> geometryInfo;
+    private Object Values;
     //private Map<String, Object> properties;
 
     public SearchObject() { }
 
-    public SearchObject(String type, String id,List<GeometryInfo> coordinates) {
+    public SearchObject(String type, String id,List<GeometryInfo> coordinates, Object values) {
         this.type = type;
         this.id = id;
 
         this.geometryInfo = coordinates;
+        this.Values = values;
     }
 }

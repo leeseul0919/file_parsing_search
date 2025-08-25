@@ -12,16 +12,16 @@ public class CapabilityDto {
     private String filePath;
     private String fileType;
     private List<String> availableObjects;
-    private String epsg;
+    private String CRS;
     private List<List<Double>> bbox;
 
     public CapabilityDto() {}
 
-    public CapabilityDto(String fileType, List<String> availableObjects, List<List<Double>> bbox, String filePath, String epsg) {
+    public CapabilityDto(String fileType, List<String> availableObjects, List<List<Double>> bbox, String filePath, String CRS) {
         this.fileType = fileType;
         this.availableObjects = availableObjects;
         this.bbox = bbox;
         this.filePath = filePath;
-        this.epsg = epsg;
+        this.CRS = CRS;
     }
 }
