@@ -347,41 +347,50 @@ public class HDF5Parser implements ObjectParser{
                                                 List<Object> parsedValues = new ArrayList<>();
 
                                                 Object valuesRaw = valueDataset.getData();
-                                                //System.out.println(valuesRaw.getClass() + "isArray: " + valuesRaw.getClass().isArray());
                                                 List<String> tmpcodeList = tmpobjType.getCodeList();
                                                 List<String> tmpuomList = tmpobjType.getUomNameList();
-                                                //System.out.println("List size: " + tmpcodeList.size());
 
                                                 //컬럼이 한개인 상태랑 여러개인 상태 나눠서?
                                                 //한개면 그냥 단순 배열일거고 여러개면 codeList에서 하나씩 꺼내서 컬럼명으로 꺼내야 하나?
                                                 //꺼낼때 tmpobjType에서 dataTypeList에서 확인하면서 꺼내야 함
-                                                // 단일 컬럼
-                                                if(tmpcodeList.size() == 1) {
-                                                    //int latsize = 동적으로 latsize, lonsize 재고
-                                                    int latsize = java.lang.reflect.Array.getLength(valuesRaw);
-                                                    int lonsize  = 0;
-                                                    if (latsize > 0) {
-                                                        Object firstRow = java.lang.reflect.Array.get(valuesRaw, 0);
-                                                        lonsize = java.lang.reflect.Array.getLength(firstRow);
-                                                    }
-                                                    //System.out.println(objIdGroup.getName() + " single column " + latsize + ", "+lonsize);
 
-                                                    for(int i=0; i<latsize; i++){
-                                                        Object rowArray = java.lang.reflect.Array.get(valuesRaw, i); // float[] 등 primitive 배열
+                                                // 단일 컬럼
+                                                // 단일 컬럼
+                                                if (tmpcodeList.size() == 1) {
+                                                    int latsize = 1;
+                                                    // valuesRaw가 배열일 때만 길이를 가져옴
+                                                    if (valuesRaw != null && valuesRaw.getClass().isArray()) {
+                                                        latsize = java.lang.reflect.Array.getLength(valuesRaw);
+                                                    }
+
+                                                    for (int i = 0; i < latsize; i++) {
                                                         List<Object> rowValues = new ArrayList<>();
-                                                        if(rowArray.getClass().isArray()) {
-                                                            for(int j=0;j<lonsize;j++) {
-                                                                Object val = java.lang.reflect.Array.get(rowArray, j);
-                                                                rowValues.add(castPrimitive(val));
+
+                                                        if (valuesRaw.getClass().isArray()) {
+                                                            // valuesRaw가 배열인 경우, i번째 행을 가져옴
+                                                            Object rowData = java.lang.reflect.Array.get(valuesRaw, i);
+
+                                                            if (rowData != null && rowData.getClass().isArray()) {
+                                                                // rowData가 2차원 배열의 '행'인 경우
+                                                                for (int j = 0; j < java.lang.reflect.Array.getLength(rowData); j++) {
+                                                                    Object val = java.lang.reflect.Array.get(rowData, j);
+                                                                    rowValues.add(castPrimitive(val));
+                                                                }
+                                                            } else {
+                                                                // rowData가 단일 값인 경우 (1차원 배열의 요소)
+                                                                rowValues.add(castPrimitive(rowData));
                                                             }
-                                                        }
-                                                        else {
-                                                            rowValues.add(castPrimitive(rowArray));
+                                                        } else {
+                                                            // valuesRaw 자체가 단일 값인 경우
+                                                            rowValues.add(castPrimitive(valuesRaw));
                                                         }
                                                         parsedValues.add(rowValues);
                                                     }
-                                                    List<Object> tmpSizeCheck = (List<Object>) parsedValues.get(0);
-                                                    //System.out.println(valueGroup.getName() + ": (" + parsedValues.size() + ", " + tmpSizeCheck.size() + ")");
+
+                                                    if (!parsedValues.isEmpty()) {
+                                                        List<Object> tmpSizeCheck = (List<Object>) parsedValues.get(0);
+                                                        System.out.println(valueGroup.getName() + ": (" + parsedValues.size() + ", " + tmpSizeCheck.size() + ")");
+                                                    }
                                                 }
                                                 // 다중 컬럼
                                                 else {
@@ -390,31 +399,46 @@ public class HDF5Parser implements ObjectParser{
                                                     String firstCode = tmpcodeList_t.get(0);
                                                     Object firstColData = valuesMap.get(firstCode);
 
-                                                    // 첫 번째 컬럼 데이터의 배열 크기를 기준으로 동적 크기 측정
-                                                    int latsize = java.lang.reflect.Array.getLength(firstColData);
-                                                    for(int i=0;i<latsize;i++) {
-                                                        Map<String, Object> tmpparseValues = new HashMap<>();
+                                                    // latsize 동적 계산
+                                                    int latsize = 1;
+                                                    if (firstColData.getClass().isArray()) {
+                                                        latsize = java.lang.reflect.Array.getLength(firstColData);
+                                                    }
 
-                                                        for(String tmpcode:tmpcodeList_t) {
-                                                            List<Object> rowValues = new ArrayList<>();
-                                                            //System.out.println(valuesMap.get(tmpcode));
-                                                            Object rowArray = java.lang.reflect.Array.get(valuesMap.get(tmpcode), i);
-                                                            if(rowArray.getClass().isArray()) {
-                                                                int currentLonsize = java.lang.reflect.Array.getLength(rowArray);
-                                                                for(int j=0;j<currentLonsize;j++) {
-                                                                    Object val = java.lang.reflect.Array.get(rowArray, j);
-                                                                    rowValues.add(castPrimitive(val));
+                                                    for (int latIdx = 0; latIdx < latsize; latIdx++) {
+                                                        List<Object> latArray = new ArrayList<>();
+                                                        for (String tmpcode : tmpcodeList_t) {
+                                                            Object colData = valuesMap.get(tmpcode);
+                                                            if (colData != null && colData.getClass().isArray()) {
+                                                                latArray.add(java.lang.reflect.Array.get(colData, latIdx));
+                                                            } else {
+                                                                latArray.add(colData);
+                                                            }
+                                                        }
+
+                                                        int lonsize = 1;
+                                                        if (!latArray.isEmpty() && latArray.get(0) != null && latArray.get(0).getClass().isArray()) {
+                                                            lonsize = java.lang.reflect.Array.getLength(latArray.get(0));
+                                                        }
+
+                                                        // 각 행의 데이터를 파싱하여 HDFValues에 추가
+                                                        List<List<Object>> rowRecords = new ArrayList<>();
+                                                        for (int lonIdx = 0; lonIdx < lonsize; lonIdx++) {
+                                                            List<Object> pointRecord = new ArrayList<>();
+                                                            for (Object rowData : latArray) {
+                                                                if (rowData != null && rowData.getClass().isArray()) {
+                                                                    if (java.lang.reflect.Array.getLength(rowData) > lonIdx) {
+                                                                        Object val = java.lang.reflect.Array.get(rowData, lonIdx);
+                                                                        pointRecord.add(castPrimitive(val));
+                                                                    }
+                                                                } else {
+                                                                    pointRecord.add(castPrimitive(rowData));
                                                                 }
                                                             }
-                                                            else {
-                                                                rowValues.add(castPrimitive(rowArray));
-                                                            }
-                                                            tmpparseValues.put(tmpcode,rowValues);
+                                                            rowRecords.add(pointRecord);
                                                         }
-                                                        parsedValues.add(tmpparseValues);
+                                                        parsedValues.add(rowRecords);
                                                     }
-                                                    Map<String,List<Object>> tmpSizeCheck = (Map<String, List<Object>>) parsedValues.get(0);
-                                                    //System.out.println(valueGroup.getName() + ": (" + parsedValues.size() + ", " + tmpSizeCheck.get(tmpcodeList.get(0)).size() + ")");
                                                 }
                                                 HDFValues tmpHDFValues = new HDFValues(valueGroup.getName(),timePoint,parsedValues,timeInterval,tmpcodeList,tmpuomList);
                                                 hdfResults.add(tmpHDFValues);
@@ -439,19 +463,19 @@ public class HDF5Parser implements ObjectParser{
         //System.out.println(val.getClass());
         if(val == null) return null;
         if (val instanceof Float) {
-            return ((Float) val).doubleValue();
+            double d = ((Float) val).doubleValue();
+            return Math.round(d * 1e3) / 1e3;
         } else if (val instanceof Double) {
-            return val; // 이미 Double이므로 그대로 반환
+            return Math.round((Double) val * 1e3) / 1e3;
         } else if (val instanceof Short) {
             return ((Short) val).longValue();
         } else if (val instanceof Integer) {
             return ((Integer) val).longValue();
         } else if (val instanceof Long) {
-            return val; // 이미 Long이므로 그대로 반환
+            return val;
         } else if (val instanceof String) {
-            return val; // 이미 String이므로 그대로 반환
+            return val;
         } else {
-            // 이외의 타입은 그대로 반환하거나 특정 로직 추가
             System.out.println("Unknown data type: " + val.getClass().getName());
             return val;
         }
