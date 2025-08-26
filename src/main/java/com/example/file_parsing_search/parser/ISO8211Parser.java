@@ -4,17 +4,23 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GeometryInfo;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
+import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Polygon;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import org.gdal.gdal.gdal;
+import org.gdal.ogr.*;
+import org.gdal.osr.SpatialReference;
+
 import java.awt.*;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.List;
 
 @Component
+@Slf4j
 public class ISO8211Parser implements ObjectParser{
     @Value("${file.upload-dir}")
     private String uploadDir;
@@ -24,35 +30,83 @@ public class ISO8211Parser implements ObjectParser{
         return "iso8211";  // 이 파서는 iso8211
     }
 
+    @PostConstruct
+    public void initGdal() {
+        gdal.AllRegister();
+        ogr.RegisterAll();
+        log.info("GDAL 및 OGR 초기화 완료");
+    }
+
     @Override
     public CapabilityDto getcapability(String filePath, String fileType) {
-        String fileName = Paths.get(filePath).getFileName().toString();
-
-        List<String> objectList = new ArrayList<>();
-        List<List<Double>> fileBBOX = new ArrayList<>();
-        double lowerLon = 0.0;
-        double lowerLat = 0.0;
-        double upperLon = 0.0;
-        double upperLat = 0.0;
-        String epsg = "";
-
-        // --- 파일 파싱 되었을 때 여기로 변경 ---
-        //1. 전달받은 filePath로 접근
-        //2. 파일 열고 객체 목록들과 파일의 bbox 정보 가져오기
-        //3. ObjectList, fileBBOX에 넣고
-        //4. Map으로 묶은뒤 반환
-
-        // --- 파서 완성 전 mock 초기값 ---
-        objectList.add("ObjectA");
-        objectList.add("ObjectB");
-        List<Double> lower = List.of(lowerLon,lowerLat);
-        List<Double> upper = List.of(upperLon,upperLat);
-        fileBBOX.add(lower);
-        fileBBOX.add(upper);
-        epsg = "4326";
-
         String normalizedPath = filePath.replace("\\", "/");
-        return new CapabilityDto(fileType, objectList, fileBBOX, normalizedPath, epsg);
+        log.info(filePath);
+        if (filePath.length() < 1) {
+            System.out.println("Usage: java ReadISO8211 <iso8211_file>");
+            return null;
+        }
+
+        DataSource ds = ogr.Open(filePath, 0); // 0 = read-only
+        if (ds == null) {
+            System.err.println("Failed to open file: " + filePath);
+            return null;
+        }
+
+        System.out.println("Opened file: " + filePath);
+
+        double globalMinX = Double.MAX_VALUE;
+        double globalMinY = Double.MAX_VALUE;
+        double globalMaxX = -Double.MAX_VALUE;
+        double globalMaxY = -Double.MAX_VALUE;
+
+        Set<String> objectTypes = new HashSet<>();
+
+        Set<String> metadataLayerNames = Set.of(
+                "DSID", "DSPM", "VRID", "FRID", "FOID", "FSPM",
+                "FOVL", "FOUB", "FOND", "FOAR", "FOSN",
+                "DSSI", "DSPT", "FRSP", "VRSP", "RSTA", "RVER"
+        );
+
+        int layerCount = ds.GetLayerCount();
+        String CRS = "unknown";
+
+        for (int i = 0; i < layerCount; i++) {
+            Layer layer = ds.GetLayer(i);
+            if (layer == null) continue;
+
+            String layerName = layer.GetName();
+
+            if (!metadataLayerNames.contains(layerName)) {
+                objectTypes.add(layerName);
+            }
+
+            if (CRS.equals("unknown")) {
+                SpatialReference sr = layer.GetSpatialRef();
+                if (sr != null) {
+                    String name = sr.GetAuthorityName(null);
+                    String code = sr.GetAuthorityCode(null);
+                    if (name != null && code != null) {
+                        CRS = name + ":" + code;
+                    }
+                }
+            }
+
+            double[] extent = layer.GetExtent(true);
+            if (extent != null) {
+                globalMinX = Math.min(globalMinX, extent[0]);
+                globalMaxX = Math.max(globalMaxX, extent[1]);
+                globalMinY = Math.min(globalMinY, extent[2]);
+                globalMaxY = Math.max(globalMaxY, extent[3]);
+            }
+        }
+
+        List<Double> minPos = List.of(globalMinX, globalMinY);
+        List<Double> maxPos = List.of(globalMaxX, globalMaxY);
+        List<List<Double>> PosInfo = List.of(minPos, maxPos); // [ [minX, minY], [maxX, maxY] ]
+
+        List<String> objectTypesList = new ArrayList<>(objectTypes);
+
+        return new CapabilityDto(fileType, objectTypesList, PosInfo, normalizedPath, CRS);
     }
 
     @Override

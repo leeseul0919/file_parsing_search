@@ -40,7 +40,6 @@ public class GMLParser implements ObjectParser{
 
     @Override
     public CapabilityDto getcapability(String filePath, String fileType) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {
-        String fileName = Paths.get(filePath).getFileName().toString();
         XPath xpath = XPathFactory.newInstance().newXPath();
 
         List<List<Double>> fileBBOX = new ArrayList<>();

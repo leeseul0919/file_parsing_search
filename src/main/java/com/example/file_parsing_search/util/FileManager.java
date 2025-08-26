@@ -81,13 +81,11 @@ public class FileManager {
                 // 2차로 확장자로 파서를 찾았을 때 없는 경우 거르기,
                 ObjectParser parser = getParserByFileType(fileType);
                 if (parser == null) {
-                    //System.out.println("해당 타입 파서 없음: " + fileType);
                     continue;
                 }
 
                 CapabilityDto capabilityInfo = parser.getcapability(file.getAbsolutePath(), fileType);
                 if(capabilityInfo != null) resultFiles.add(capabilityInfo);
-                //System.out.println("로드 완료: " + capabilityInfo.getFilePath());
             }
         }
         return resultFiles;

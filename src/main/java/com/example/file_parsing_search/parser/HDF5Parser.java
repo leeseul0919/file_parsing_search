@@ -46,8 +46,6 @@ public class HDF5Parser implements ObjectParser{
 
     @Override
     public CapabilityDto getcapability(String filePath, String fileType) {
-        String fileName = Paths.get(filePath).getFileName().toString();
-
         List<String> objectList = new ArrayList<>();
         List<List<Double>> fileBBOX = new ArrayList<>();
         String westbbox = "0.0";
