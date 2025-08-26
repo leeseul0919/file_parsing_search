@@ -14,17 +14,22 @@ import lombok.Setter;
 public class SearchObject {
     private String type;
     private String id;
-    private List<GeometryInfo> geometryInfo;
-    private Object Values;
+    private Map<String, String> fieldInfo;
+    private List<ObjGroupInfo> objGroupInfos;
     //private Map<String, Object> properties;
 
     public SearchObject() { }
 
-    public SearchObject(String type, String id,List<GeometryInfo> coordinates, Object values) {
+    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, List<ObjGroupInfo> objGroupInfos) {
         this.type = type;
         this.id = id;
+        this.objGroupInfos = objGroupInfos;
 
-        this.geometryInfo = coordinates;
-        this.Values = values;
+        this.fieldInfo = new HashMap<>();
+        if(fieldList!=null && uomNameList!=null) {
+            for(int i=0;i<fieldList.size();i++) {
+                this.fieldInfo.put(fieldList.get(i),uomNameList.get(i));
+            }
+        }
     }
 }

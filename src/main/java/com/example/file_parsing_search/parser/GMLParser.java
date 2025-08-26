@@ -1,9 +1,6 @@
 package com.example.file_parsing_search.parser;
 
-import com.example.file_parsing_search.dto.CapabilityDto;
-import com.example.file_parsing_search.dto.GeometryInfo;
-import com.example.file_parsing_search.dto.GetObjectRequestDto;
-import com.example.file_parsing_search.dto.SearchObject;
+import com.example.file_parsing_search.dto.*;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +21,6 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.*;
 
 @Component
@@ -133,14 +129,19 @@ public class GMLParser implements ObjectParser{
             String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
             log.info("gml:id >>" + gmlId);
 
+            List<ObjGroupInfo> tmpGroupInfo = new ArrayList<>();
+            ObjGroupInfo tmpGroup = new ObjGroupInfo();
+            List<ObjInfo> tmpObjInfos = new ArrayList<>();
+
             NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
             log.info("gml geometry >> "+geoList.getLength());
-            List<GeometryInfo> responseGeo = new ArrayList<>();
+            //List<GeometryInfo> responseGeo = new ArrayList<>();
             for(int j=0;j< geoList.getLength();j++) {
                 Element geoChild = (Element) geoList.item(j);
                 NodeList pointList = (NodeList) xpath.evaluate(".//*[local-name()='Point']", geoChild, XPathConstants.NODESET);
                 NodeList surfaceList = (NodeList) xpath.evaluate(".//*[local-name()='Surface']", geoChild, XPathConstants.NODESET);
                 NodeList polygonList = (NodeList) xpath.evaluate(".//*[local-name()='Polygon']", geoChild, XPathConstants.NODESET);
+                NodeList curveList = (NodeList) xpath.evaluate(".//*[local-name()='Curve']", geoChild, XPathConstants.NODESET);
                 log.info("Point >> " + pointList.getLength());
                 log.info("Surface >> " + surfaceList.getLength());
                 log.info("Polygon >> " + polygonList.getLength());
@@ -148,7 +149,7 @@ public class GMLParser implements ObjectParser{
                 for(int k=0;k<pointList.getLength();k++) {
                     Node tmpPoint = pointList.item(k);
                     Node pointNode = (Node) xpath.evaluate(".//*[local-name()='pos']",tmpPoint,XPathConstants.NODE);
-                    List<Double> tmpP = new ArrayList<>();
+                    List<Object> tmpP = new ArrayList<>();
                     if(pointNode != null) {
                         String[] coords = pointNode.getTextContent().trim().split("\\s+");
                         Point p = gf.createPoint(new Coordinate(Double.parseDouble(coords[0]), Double.parseDouble(coords[1])));
@@ -158,105 +159,159 @@ public class GMLParser implements ObjectParser{
                         }
                     }
                     if(!tmpP.isEmpty()) {
-                        GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
-                        responseGeo.add(tmpresponse);
+                        //GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
+                        ObjInfo tmpObj = new ObjInfo("Point",tmpP,null);
+                        tmpObjInfos.add(tmpObj);
                     }
                 }
 
                 for(int k=0;k<surfaceList.getLength();k++) {
-                    List<List<List<Double>>> tmpSurfaceResult = new ArrayList<>();
+                    List<Object> tmpSurfaceResult = new ArrayList<>();
                     Node tmpSurface = surfaceList.item(k);
                     tmpSurfaceResult = surfaceFromXml(tmpSurface,polygon);
                     if(!tmpSurfaceResult.isEmpty()) {
-                        GeometryInfo tmpresponse = new GeometryInfo("Surface",tmpSurfaceResult);
-                        responseGeo.add(tmpresponse);
+                        ObjInfo tmpObj = new ObjInfo("Surface",tmpSurfaceResult,null);
+                        tmpObjInfos.add(tmpObj);
                     }
                 }
 
                 for(int k=0;k<polygonList.getLength();k++) {
-                    List<List<List<Double>>> tmpPolygonResult = new ArrayList<>();
+                    List<Object> tmpPolygonResult = new ArrayList<>();
                     Node tmpSurface = polygonList.item(k);
-                    tmpPolygonResult = polygonFromXml(tmpSurface);
+                    tmpPolygonResult = polygonFromXml(tmpSurface,polygon);
                     if(!tmpPolygonResult.isEmpty()) {
                         System.out.println("polygon input");
-                        GeometryInfo tmpresponse = new GeometryInfo("Polygon",tmpPolygonResult);
-                        responseGeo.add(tmpresponse);
+                        ObjInfo tmpObj = new ObjInfo("Polygon",tmpPolygonResult,null);
+                        tmpObjInfos.add(tmpObj);
+                    }
+                }
+
+                for(int k=0;k<curveList.getLength();k++) {
+                    List<Object> tmpCurveResult = new ArrayList<>();
+                    Node tmpCurve = curveList.item(k);
+                    tmpCurveResult = curveFromXml(tmpCurve,polygon);
+                    if(!tmpCurveResult.isEmpty()) {
+                        System.out.println("curve input");
+                        ObjInfo tmpObj = new ObjInfo("Curve",tmpCurveResult,null);
+                        tmpObjInfos.add(tmpObj);
                     }
                 }
             }
-            if(!responseGeo.isEmpty()) {
-                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,responseGeo,null);
-                gmlfeatures.add(newobject);
-            }
+            tmpGroup.setObjInfo(tmpObjInfos);
+            tmpGroupInfo.add(tmpGroup);
+            SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo);
+            gmlfeatures.add(newobject);
         }
         log.info("total: " + gmlfeatures.size());
         return gmlfeatures;
     }
 
-    public List<List<List<Double>>> surfaceFromXml(Node node, Polygon polygon) throws Exception {
-        GeometryFactory gf = new GeometryFactory();
-        if(node==null || !node.hasChildNodes()) {
-            throw new IllegalArgumentException("Node is null of has no child nodes");
-        }
+    public List<Object> surfaceFromXml(Node node, Polygon polygon) throws Exception {
         XPath xpath = XPathFactory.newInstance().newXPath();
+        GeometryFactory gf = new GeometryFactory();
+        List<Object> result = new ArrayList<>();
 
-        List<List<List<Double>>> LinearRings = new ArrayList<>();
         NodeList patchesNodes = (NodeList) xpath.evaluate(".//*[local-name()='patches']", node, XPathConstants.NODESET);
-        for(int i=0;i<patchesNodes.getLength();i++) {
-            Node patch = patchesNodes.item(i);
-            Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", patch, XPathConstants.NODE);
-            if(exteriorNode != null) {
-                List<List<Double>> exteriorRing = parseLinearRing(exteriorNode, xpath);
-                Polygon tempPolygon = createPolygon(exteriorRing);
-                if (polygon.intersects(tempPolygon) && !exteriorRing.isEmpty()) {
-                    LinearRings.add(exteriorRing);
 
-                    NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", patch, XPathConstants.NODESET);
-                    for (int j = 0; j < interiorNodes.getLength(); j++) {
-                        List<List<Double>> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
-                        if (!interiorRing.isEmpty()) LinearRings.add(interiorRing);
+        for (int i = 0; i < patchesNodes.getLength(); i++) {
+            Node patch = patchesNodes.item(i);
+
+            Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", patch, XPathConstants.NODE);
+            if (exteriorNode != null) {
+                List<Object> exteriorRing = parseLinearRing(exteriorNode, xpath);
+                if (!exteriorRing.isEmpty()) {
+                    Polygon exteriorPolygon = createPolygonFromRing(exteriorRing, gf);
+                    if (polygon.intersects(exteriorPolygon)) {
+                        List<Object> surface = new ArrayList<>();
+                        surface.add(exteriorRing);
+
+                        // interior
+                        NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", patch, XPathConstants.NODESET);
+                        List<List<Object>> interiorGroup = new ArrayList<>();
+                        for (int j = 0; j < interiorNodes.getLength(); j++) {
+                            List<Object> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
+                            if (!interiorRing.isEmpty()) {
+                                interiorGroup.add(interiorRing);
+                            }
+                        }
+
+                        if (!interiorGroup.isEmpty()) {
+                            surface.add(interiorGroup);
+                        }
+
+                        result.add(surface);
                     }
                 }
-            } else {
-                continue;
             }
         }
-        return LinearRings;
+
+        return result;
     }
 
-    public List<List<List<Double>>> polygonFromXml(Node node) throws Exception {
-        if(node==null || !node.hasChildNodes()) {
-            throw new IllegalArgumentException("Node is null of has no child nodes");
-        }
+    public List<Object> curveFromXml(Node node, Polygon polygon) throws Exception {
         XPath xpath = XPathFactory.newInstance().newXPath();
+        GeometryFactory gf = new GeometryFactory();
+        List<Object> result = new ArrayList<>();
 
-        List<List<List<Double>>> LinearRings = new ArrayList<>();
-        Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", node, XPathConstants.NODE);
-        if(exteriorNode != null) {
-            List<List<Double>> exteriorRing = parseLinearRing(exteriorNode, xpath);
-            if (!exteriorRing.isEmpty()) LinearRings.add(exteriorRing);
+        NodeList segmentsNodes = (NodeList) xpath.evaluate(".//*[local-name()='segments']", node, XPathConstants.NODESET);
+        for (int i = 0; i < segmentsNodes.getLength(); i++) {
+            List<Object> lineCoords = parseLinearRing(segmentsNodes.item(i), xpath);
+            if (!lineCoords.isEmpty()) {
+                LineString line = createLineStringFromCoords(lineCoords, gf);
+                if (polygon.intersects(line)) {
+                    result.add(lineCoords);
+                }
+            }
         }
-
-        NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", node, XPathConstants.NODESET);
-        System.out.println("interior 개수 >> " + interiorNodes.getLength());
-        for (int j = 0; j < interiorNodes.getLength(); j++) {
-            List<List<Double>> interiorRing = parseLinearRing(interiorNodes.item(j), xpath);
-            if (!interiorRing.isEmpty()) LinearRings.add(interiorRing);
-        }
-
-        return LinearRings;
+        return result;
     }
 
-    private List<List<Double>> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
+    public List<Object> polygonFromXml(Node node, Polygon polygon) throws Exception {
+        XPath xpath = XPathFactory.newInstance().newXPath();
+        GeometryFactory gf = new GeometryFactory();
+        List<Object> result = new ArrayList<>();
+
+        Node exteriorNode = (Node) xpath.evaluate(".//*[local-name()='exterior']", node, XPathConstants.NODE);
+        if (exteriorNode != null) {
+            List<Object> exteriorRing = parseLinearRing(exteriorNode, xpath);
+            if (!exteriorRing.isEmpty()) {
+                Polygon exteriorPolygon = createPolygonFromRing(exteriorRing, gf);
+                if (polygon.intersects(exteriorPolygon)) {
+                    List<Object> polygonGeom = new ArrayList<>();
+                    polygonGeom.add(exteriorRing);
+
+                    // interior
+                    NodeList interiorNodes = (NodeList) xpath.evaluate(".//*[local-name()='interior']", node, XPathConstants.NODESET);
+                    List<List<Object>> interiorGroup = new ArrayList<>();
+                    for (int i = 0; i < interiorNodes.getLength(); i++) {
+                        List<Object> interiorRing = parseLinearRing(interiorNodes.item(i), xpath);
+                        if (!interiorRing.isEmpty()) {
+                            interiorGroup.add(interiorRing);
+                        }
+                    }
+
+                    if (!interiorGroup.isEmpty()) {
+                        polygonGeom.add(interiorGroup);
+                    }
+
+                    result.add(polygonGeom);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private List<Object> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
         Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
         Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
-        List<List<Double>> coordinates = new ArrayList<>();
+        List<Object> coordinates = new ArrayList<>();
 
         if (posListNode != null) {
             String[] tokens = posListNode.getTextContent().trim().split("\\s+");
             //System.out.println(posListNode.getTextContent());
             for (int i = 0; i < tokens.length; i += 2) {
-                List<Double> tmppos = new ArrayList<>();
+                List<Object> tmppos = new ArrayList<>();
                 tmppos.add(Double.parseDouble(tokens[i]));
                 tmppos.add(Double.parseDouble(tokens[i + 1]));
                 coordinates.add(tmppos);
@@ -266,7 +321,7 @@ public class GMLParser implements ObjectParser{
             //System.out.println(posListNode.getTextContent());
             for (String token:tokens) {
                 String[] xy = token.split(",");
-                List<Double> tmppos = new ArrayList<>();
+                List<Object> tmppos = new ArrayList<>();
                 tmppos.add(Double.parseDouble(xy[0]));
                 tmppos.add(Double.parseDouble(xy[1]));
                 coordinates.add(tmppos);
@@ -276,7 +331,7 @@ public class GMLParser implements ObjectParser{
             NodeList posNodes = (NodeList) xpath.evaluate(".//*[local-name()='pos']", ringNode, XPathConstants.NODESET);
             for (int i = 0; i < posNodes.getLength(); i++) {
                 String[] coords = posNodes.item(i).getTextContent().trim().split("\\s+");
-                List<Double> coord = new ArrayList<>();
+                List<Object> coord = new ArrayList<>();
                 coord.add(Double.parseDouble(coords[0]));
                 coord.add(Double.parseDouble(coords[1]));
                 coordinates.add(coord);
@@ -285,14 +340,25 @@ public class GMLParser implements ObjectParser{
         return coordinates;
     }
 
-    public Polygon createPolygon(List<List<Double>> coords) {
-        GeometryFactory gf = new GeometryFactory();
-        Coordinate[] coordinates = new Coordinate[coords.size()];
-        for (int i = 0; i < coords.size(); i++) {
-            List<Double> c = coords.get(i);
-            coordinates[i] = new Coordinate(c.get(0), c.get(1));
-        }
-        LinearRing shell = gf.createLinearRing(coordinates);
-        return gf.createPolygon(shell, null);   //테두리랑 안에 비어있는 구멍들 정보, 구멍이 없다면 그냥 null
+    public Polygon createPolygonFromRing(List<Object> ring, GeometryFactory gf) {
+        Coordinate[] coords = ring.stream()
+                .map(coord -> (List<?>) coord)
+                .map(pair -> new Coordinate(
+                        ((Number) pair.get(0)).doubleValue(),  // lon (X)
+                        ((Number) pair.get(1)).doubleValue()   // lat (Y)
+                ))
+                .toArray(Coordinate[]::new);
+        return gf.createPolygon(coords);
+    }
+
+    public LineString createLineStringFromCoords(List<Object> coordsList, GeometryFactory gf) {
+        Coordinate[] coords = coordsList.stream()
+                .map(coord -> (List<?>) coord)
+                .map(pair -> new Coordinate(
+                        ((Number) pair.get(0)).doubleValue(),  // lon
+                        ((Number) pair.get(1)).doubleValue()   // lat
+                ))
+                .toArray(Coordinate[]::new);
+        return gf.createLineString(coords);
     }
 }

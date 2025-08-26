@@ -4,7 +4,6 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.SearchObject;
 import org.locationtech.jts.geom.Polygon;
-import org.springframework.stereotype.Component;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
