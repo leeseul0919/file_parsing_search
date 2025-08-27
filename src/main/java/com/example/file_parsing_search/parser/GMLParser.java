@@ -305,6 +305,7 @@ public class GMLParser implements ObjectParser{
 
     private List<Object> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
         Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
+        Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
         List<Object> coordinates = new ArrayList<>();
 
         if (posListNode != null) {
@@ -312,8 +313,8 @@ public class GMLParser implements ObjectParser{
             //System.out.println(posListNode.getTextContent());
             for (int i = 0; i < tokens.length; i += 2) {
                 List<Object> tmppos = new ArrayList<>();
-                tmppos.add(Double.parseDouble(tokens[i]));
-                tmppos.add(Double.parseDouble(tokens[i + 1]));
+                tmppos.add(round6(Double.parseDouble(tokens[i])));
+                tmppos.add(round6(Double.parseDouble(tokens[i + 1])));
                 coordinates.add(tmppos);
             }
         }
@@ -322,12 +323,16 @@ public class GMLParser implements ObjectParser{
             for (int i = 0; i < posNodes.getLength(); i++) {
                 String[] coords = posNodes.item(i).getTextContent().trim().split("\\s+");
                 List<Object> coord = new ArrayList<>();
-                coord.add(Double.parseDouble(coords[0]));
-                coord.add(Double.parseDouble(coords[1]));
+                coord.add(round6(Double.parseDouble(coords[0])));
+                coord.add(round6(Double.parseDouble(coords[1])));
                 coordinates.add(coord);
             }
         }
         return coordinates;
+    }
+
+    private static double round6(double value) {
+        return Math.round(value * 1_000_000d) / 1_000_000d;
     }
 
     public Polygon createPolygonFromRing(List<Object> ring, GeometryFactory gf) {
