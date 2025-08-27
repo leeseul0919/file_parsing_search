@@ -14,21 +14,23 @@ import lombok.Setter;
 public class SearchObject {
     private String type;
     private String id;
-    private Map<String, String> fieldInfo;
-    private List<ObjGroupInfo> objGroupInfos;
+    private Map<String, String> valueFields;
+    private List<ObjGroupInfo> ObjList;
+    private Map<String,String> Attribute;
     //private Map<String, Object> properties;
 
     public SearchObject() { }
 
-    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, List<ObjGroupInfo> objGroupInfos) {
+    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, List<ObjGroupInfo> objGroupInfos, Map<String, String> attribute) {
         this.type = type;
         this.id = id;
-        this.objGroupInfos = objGroupInfos;
+        this.ObjList = objGroupInfos;
+        this.Attribute = attribute;
 
-        this.fieldInfo = new HashMap<>();
+        this.valueFields = new HashMap<>();
         if(fieldList!=null && uomNameList!=null) {
             for(int i=0;i<fieldList.size();i++) {
-                this.fieldInfo.put(fieldList.get(i),uomNameList.get(i));
+                this.valueFields.put(fieldList.get(i),uomNameList.get(i));
             }
         }
     }

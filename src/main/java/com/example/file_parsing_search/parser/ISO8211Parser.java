@@ -106,6 +106,8 @@ public class ISO8211Parser implements ObjectParser{
         return new CapabilityDto(fileType, objectTypesList, PosInfo, normalizedPath, CRS);
     }
 
+    private final List<String> attrNames = List.of("rcid","grup","objl","sordat","sorind");
+
     @Override
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
         List<SearchObject> iso8211features = new ArrayList<>();
@@ -146,13 +148,12 @@ public class ISO8211Parser implements ObjectParser{
                 ObjGroupInfo tmpObjGroup = new ObjGroupInfo();
                 List<ObjInfo> tmpObjs = new ArrayList<>();
 
-                /*
+                Map<String, String> tmpAttribute = new HashMap<>();
                 for (int j = 0; j < defn.GetFieldCount(); j++) {
                     FieldDefn fieldDefn = defn.GetFieldDefn(j);
-                    String fieldName = fieldDefn.GetNameRef();
-                    System.out.println("   " + fieldName + " = " + feature.GetFieldAsString(j));
+                    String fieldName = fieldDefn.GetNameRef().toLowerCase();
+                    if(attrNames.contains(fieldName)) tmpAttribute.put(fieldDefn.GetNameRef(),feature.GetFieldAsString(j));
                 }
-                 */
 
                 Geometry geom = feature.GetGeometryRef();
                 if (geom != null) {
@@ -217,7 +218,8 @@ public class ISO8211Parser implements ObjectParser{
                     tmpObjGroup.setObjInfo(tmpObjs);
                     tmpObjGroups.add(tmpObjGroup);
 
-                    tmpSearchObject.setObjGroupInfos(tmpObjGroups);
+                    tmpSearchObject.setObjList(tmpObjGroups);
+                    tmpSearchObject.setAttribute(tmpAttribute);
                     iso8211features.add(tmpSearchObject);
                 }
                 feature.delete();

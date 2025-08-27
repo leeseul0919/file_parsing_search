@@ -200,7 +200,7 @@ public class GMLParser implements ObjectParser{
             }
             tmpGroup.setObjInfo(tmpObjInfos);
             tmpGroupInfo.add(tmpGroup);
-            SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo);
+            SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo,null);
             gmlfeatures.add(newobject);
         }
         log.info("total: " + gmlfeatures.size());

@@ -475,7 +475,7 @@ public class HDF5Parser implements ObjectParser{
                                         }
                                     }
                                 }
-                                SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,hdfResults);
+                                SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,hdfResults,null);
                                 hdf5features.add(tmpSearchObj);
                             }
                         }
