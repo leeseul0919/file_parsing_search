@@ -109,6 +109,7 @@ public class ISO8211Parser implements ObjectParser{
     @Override
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
         List<SearchObject> iso8211features = new ArrayList<>();
+        int cnt = 0;
 
         String isoFilePath = request.getFilePath().replace("\\", "/");
         DataSource ds = ogr.Open(isoFilePath, 0); // 0 = read-only
@@ -134,7 +135,7 @@ public class ISO8211Parser implements ObjectParser{
             Feature feature;
 
             while ((feature = layer.GetNextFeature()) != null) {
-                //System.out.println("-- Feature ID: " + feature.GetFID());
+                cnt+=1;
 
                 SearchObject tmpSearchObject = new SearchObject();
                 List<ObjGroupInfo> tmpObjGroups = new ArrayList<>();
@@ -158,8 +159,12 @@ public class ISO8211Parser implements ObjectParser{
                     String wkt = geom.ExportToWkt();
                     org.locationtech.jts.geom.Geometry jtsGeom = reader.read(wkt);
 
+                    if (!polygon.contains(jtsGeom)) {
+                        feature.delete();
+                        continue;
+                    }
+
                     String geomType = jtsGeom.getGeometryType();
-                    System.out.println("Geometry type: " + geomType);
 
                     List<Object> coordsList = new ArrayList<>();
 
@@ -178,9 +183,7 @@ public class ISO8211Parser implements ObjectParser{
                         }
                         case "Polygon" -> {
                             Polygon poly = (Polygon) jtsGeom;
-                            // 외곽 링
                             coordsList.add(toRing(poly.getExteriorRing()));
-                            // 내부 링들 (홀)
                             for (int k = 0; k < poly.getNumInteriorRing(); k++) {
                                 coordsList.add(toRing(poly.getInteriorRingN(k)));
                             }
@@ -206,7 +209,7 @@ public class ISO8211Parser implements ObjectParser{
                             System.out.println("Unhandled geometry type: " + geomType);
                         }
                     }
-                    ObjInfo tmpObj = new ObjInfo(geomType,coordsList,null);
+                    ObjInfo tmpObj = new ObjInfo(geomType, coordsList, null);
                     tmpObjs.add(tmpObj);
                 }
                 if(!tmpObjs.isEmpty()) {
@@ -221,6 +224,7 @@ public class ISO8211Parser implements ObjectParser{
             }
         }
         ds.delete();
+        log.info("parsing end: "+cnt + ", result cnt: " + iso8211features.size());
         return iso8211features;
     }
     private static List<Double> toPair(Coordinate c) {
