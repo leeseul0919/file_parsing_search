@@ -145,6 +145,7 @@ public class GMLParser implements ObjectParser{
                 log.info("Point >> " + pointList.getLength());
                 log.info("Surface >> " + surfaceList.getLength());
                 log.info("Polygon >> " + polygonList.getLength());
+                log.info("Curve >> " + curveList.getLength());
 
                 for(int k=0;k<pointList.getLength();k++) {
                     Node tmpPoint = pointList.item(k);
@@ -304,7 +305,6 @@ public class GMLParser implements ObjectParser{
 
     private List<Object> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
         Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
-        Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
         List<Object> coordinates = new ArrayList<>();
 
         if (posListNode != null) {
@@ -314,16 +314,6 @@ public class GMLParser implements ObjectParser{
                 List<Object> tmppos = new ArrayList<>();
                 tmppos.add(Double.parseDouble(tokens[i]));
                 tmppos.add(Double.parseDouble(tokens[i + 1]));
-                coordinates.add(tmppos);
-            }
-        } else if (coordinatesListNode != null) {
-            String[] tokens = coordinatesListNode.getTextContent().trim().split("\\s+");
-            //System.out.println(posListNode.getTextContent());
-            for (String token:tokens) {
-                String[] xy = token.split(",");
-                List<Object> tmppos = new ArrayList<>();
-                tmppos.add(Double.parseDouble(xy[0]));
-                tmppos.add(Double.parseDouble(xy[1]));
                 coordinates.add(tmppos);
             }
         }
