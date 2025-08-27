@@ -1,12 +1,11 @@
 package com.example.file_parsing_search.parser;
 
-import com.example.file_parsing_search.dto.CapabilityDto;
-import com.example.file_parsing_search.dto.GeometryInfo;
-import com.example.file_parsing_search.dto.GetObjectRequestDto;
-import com.example.file_parsing_search.dto.SearchObject;
+import com.example.file_parsing_search.dto.*;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.locationtech.jts.geom.Polygon;
+import org.gdal.ogr.Geometry;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.io.WKTReader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -111,19 +110,132 @@ public class ISO8211Parser implements ObjectParser{
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
         List<SearchObject> iso8211features = new ArrayList<>();
 
-        // --- 파일 파싱 되었을 때 여기로 변경 ---
-        //1. System.getProperty("user.dir") + fileInfo.getfilePath()으로 접근해서 파일 로드
-        //2. request.getGeometry().getGeoType(), request.getGeometry().getCoordinates() 으로 파일에 사용자가 요청한 범위 계산
-        //3. 해당 범위 안에 있는 객체들 탐색, 한 객체에 대해 GeoJson 표준에 들어가는 정보들 뽑아서 SearchObject객체로 만들고
-        //4. iso8211features에 add
+        String isoFilePath = request.getFilePath().replace("\\", "/");
+        DataSource ds = ogr.Open(isoFilePath, 0); // 0 = read-only
+        if (ds == null) {
+            log.info("파일 열기 실패: " + isoFilePath);
+            return null;
+        }
 
-        // --- 파서 완성 전 mock 초기값 ---
-        SearchObject newobject1 = new SearchObject("feature","0000",null,null,null);
-        SearchObject newobject2 = new SearchObject("feature","0000",null,null,null);
+        log.info("레이어 개수: " + ds.GetLayerCount());
+        WKTReader reader = new WKTReader();
 
-        iso8211features.add(newobject1);
-        iso8211features.add(newobject2);
+        for (int i = 0; i < ds.GetLayerCount(); i++) {
+            Layer layer = ds.GetLayer(i);
+            FeatureDefn defn = layer.GetLayerDefn();
+            System.out.println(layer.GetName() + " 필드 개수: " + defn.GetFieldCount());
 
+            for (int j = 0; j < defn.GetFieldCount(); j++) {
+                FieldDefn fieldDefn = defn.GetFieldDefn(j);
+            }
+
+            // 실제 피처 값 출력
+            layer.ResetReading();
+            Feature feature;
+
+            while ((feature = layer.GetNextFeature()) != null) {
+                System.out.println("-- Feature ID: " + feature.GetFID());
+
+                SearchObject tmpSearchObject = new SearchObject();
+                List<ObjGroupInfo> tmpObjGroups = new ArrayList<>();
+
+                tmpSearchObject.setId(String.valueOf(feature.GetFID()));
+                tmpSearchObject.setType(layer.GetName());
+
+                ObjGroupInfo tmpObjGroup = new ObjGroupInfo();
+                List<ObjInfo> tmpObjs = new ArrayList<>();
+
+                /*
+                for (int j = 0; j < defn.GetFieldCount(); j++) {
+                    FieldDefn fieldDefn = defn.GetFieldDefn(j);
+                    String fieldName = fieldDefn.GetNameRef();
+                    System.out.println("   " + fieldName + " = " + feature.GetFieldAsString(j));
+                }
+                 */
+
+                Geometry geom = feature.GetGeometryRef();
+                if (geom != null) {
+                    String wkt = geom.ExportToWkt();
+                    org.locationtech.jts.geom.Geometry jtsGeom = reader.read(wkt);
+
+                    String geomType = jtsGeom.getGeometryType();
+                    System.out.println("Geometry type: " + geomType);
+
+                    List<Object> coordsList = new ArrayList<>();
+
+                    switch (geomType) {
+                        case "Point" -> {
+                            List<List<Double>> pointRing = new ArrayList<>();
+                            pointRing.add(toPair(jtsGeom.getCoordinate()));
+                            coordsList.add(pointRing);
+                        }
+                        case "LineString" -> {
+                            List<List<Double>> line = new ArrayList<>();
+                            for (Coordinate c : jtsGeom.getCoordinates()) {
+                                line.add(toPair(c));
+                            }
+                            coordsList.add(line);
+                        }
+                        case "Polygon" -> {
+                            Polygon poly = (Polygon) jtsGeom;
+                            // 외곽 링
+                            coordsList.add(toRing(poly.getExteriorRing()));
+                            // 내부 링들 (홀)
+                            for (int k = 0; k < poly.getNumInteriorRing(); k++) {
+                                coordsList.add(toRing(poly.getInteriorRingN(k)));
+                            }
+                        }
+                        case "MultiLineString" -> {
+                            MultiLineString mls = (MultiLineString) jtsGeom;
+                            for (int k = 0; k < mls.getNumGeometries(); k++) {
+                                LineString ls = (LineString) mls.getGeometryN(k);
+                                coordsList.add(toRing(ls));
+                            }
+                        }
+                        case "MultiPolygon" -> {
+                            MultiPolygon mp = (MultiPolygon) jtsGeom;
+                            for (int k = 0; k < mp.getNumGeometries(); k++) {
+                                Polygon poly = (Polygon) mp.getGeometryN(k);
+                                coordsList.add(toRing(poly.getExteriorRing()));
+                                for (int l = 0; l < poly.getNumInteriorRing(); l++) {
+                                    coordsList.add(toRing(poly.getInteriorRingN(l)));
+                                }
+                            }
+                        }
+                        default -> {
+                            System.out.println("Unhandled geometry type: " + geomType);
+                        }
+                    }
+                    ObjInfo tmpObj = new ObjInfo(geomType,coordsList,null);
+                    tmpObjs.add(tmpObj);
+                }
+                tmpObjGroup.setTimePoint(null);
+                tmpObjGroup.setObjInfo(tmpObjs);
+                tmpObjGroups.add(tmpObjGroup);
+
+                tmpSearchObject.setObjGroupInfos(tmpObjGroups);
+                iso8211features.add(tmpSearchObject);
+            }
+        }
+        ds.delete();
         return iso8211features;
+    }
+    private static List<Double> toPair(Coordinate c) {
+        List<Double> pair = new ArrayList<>();
+        pair.add(round6(c.x));
+        pair.add(round6(c.y));
+        return pair;
+    }
+
+    private static List<List<Double>> toRing(org.locationtech.jts.geom.LineString ring) {
+        List<List<Double>> result = new ArrayList<>();
+        for (Coordinate c : ring.getCoordinates()) {
+            result.add(toPair(c));
+        }
+        return result;
+    }
+
+    private static double round6(double value) {
+        return Math.round(value * 1_000_000.0) / 1_000_000.0;
     }
 }
