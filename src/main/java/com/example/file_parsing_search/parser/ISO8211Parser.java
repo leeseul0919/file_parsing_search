@@ -117,7 +117,7 @@ public class ISO8211Parser implements ObjectParser{
             return null;
         }
 
-        log.info("레이어 개수: " + ds.GetLayerCount());
+        //log.info("레이어 개수: " + ds.GetLayerCount());
         WKTReader reader = new WKTReader();
 
         for (int i = 0; i < ds.GetLayerCount(); i++) {
@@ -134,7 +134,7 @@ public class ISO8211Parser implements ObjectParser{
             Feature feature;
 
             while ((feature = layer.GetNextFeature()) != null) {
-                System.out.println("-- Feature ID: " + feature.GetFID());
+                //System.out.println("-- Feature ID: " + feature.GetFID());
 
                 SearchObject tmpSearchObject = new SearchObject();
                 List<ObjGroupInfo> tmpObjGroups = new ArrayList<>();
@@ -209,12 +209,15 @@ public class ISO8211Parser implements ObjectParser{
                     ObjInfo tmpObj = new ObjInfo(geomType,coordsList,null);
                     tmpObjs.add(tmpObj);
                 }
-                tmpObjGroup.setTimePoint(null);
-                tmpObjGroup.setObjInfo(tmpObjs);
-                tmpObjGroups.add(tmpObjGroup);
+                if(!tmpObjs.isEmpty()) {
+                    tmpObjGroup.setTimePoint(null);
+                    tmpObjGroup.setObjInfo(tmpObjs);
+                    tmpObjGroups.add(tmpObjGroup);
 
-                tmpSearchObject.setObjGroupInfos(tmpObjGroups);
-                iso8211features.add(tmpSearchObject);
+                    tmpSearchObject.setObjGroupInfos(tmpObjGroups);
+                    iso8211features.add(tmpSearchObject);
+                }
+                feature.delete();
             }
         }
         ds.delete();
