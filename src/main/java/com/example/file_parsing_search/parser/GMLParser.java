@@ -119,7 +119,38 @@ public class GMLParser implements ObjectParser{
         Document doc = (Document) builder.parse(gmlFilePath);
         doc.getDocumentElement().normalize();   //모든 요소들을 dom tree 구조로 만들어 두고
 
+        NodeList imemberList = (NodeList) xpath.evaluate(".//*[local-name()='imember']", doc, XPathConstants.NODESET);
+        Map<String, String> featureIdTypeMap = new HashMap<>();
+        for (int i = 0; i < imemberList.getLength(); i++) {
+            Node imemberNode = imemberList.item(i);
+            if (imemberNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element imemberElement = (Element) imemberNode;
+                NodeList childNodes = imemberElement.getElementsByTagName("*");
+                if (childNodes.getLength() > 0) {
+                    Element firstChild = (Element) childNodes.item(0);
+                    String gmlId = firstChild.getAttribute("gml:id");
+                    String objectType = firstChild.getTagName();
+                    if (!gmlId.isEmpty()) {
+                        featureIdTypeMap.put(gmlId, objectType);
+                    }
+                }
+            }
+        }
+
         NodeList memberList = (NodeList) xpath.evaluate(".//*[local-name()='member']", doc, XPathConstants.NODESET);
+        for (int i = 0; i < memberList.getLength(); i++) {
+            Element member = (Element) memberList.item(i);
+            NodeList memberChildNodes = member.getElementsByTagName("*");
+            if (memberChildNodes.getLength() > 0) {
+                Element firstChild = (Element) memberChildNodes.item(0);
+                String gmlId = firstChild.getAttribute("gml:id");
+                String objectType = firstChild.getTagName();
+                if (!gmlId.isEmpty()) {
+                    featureIdTypeMap.putIfAbsent(gmlId, objectType);
+                }
+            }
+        }
+
         log.info("member: " + memberList.getLength());
         for (int i=0;i< memberList.getLength();i++) {
             Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
@@ -127,14 +158,12 @@ public class GMLParser implements ObjectParser{
             NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
             Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
             String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
-            log.info("gml:id >>" + gmlId);
 
             List<ObjGroupInfo> tmpGroupInfo = new ArrayList<>();
             ObjGroupInfo tmpGroup = new ObjGroupInfo();
             List<ObjInfo> tmpObjInfos = new ArrayList<>();
 
             NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
-            log.info("gml geometry >> "+geoList.getLength());
             //List<GeometryInfo> responseGeo = new ArrayList<>();
             for(int j=0;j< geoList.getLength();j++) {
                 Element geoChild = (Element) geoList.item(j);
@@ -142,10 +171,6 @@ public class GMLParser implements ObjectParser{
                 NodeList surfaceList = (NodeList) xpath.evaluate(".//*[local-name()='Surface']", geoChild, XPathConstants.NODESET);
                 NodeList polygonList = (NodeList) xpath.evaluate(".//*[local-name()='Polygon']", geoChild, XPathConstants.NODESET);
                 NodeList curveList = (NodeList) xpath.evaluate(".//*[local-name()='Curve']", geoChild, XPathConstants.NODESET);
-                log.info("Point >> " + pointList.getLength());
-                log.info("Surface >> " + surfaceList.getLength());
-                log.info("Polygon >> " + polygonList.getLength());
-                log.info("Curve >> " + curveList.getLength());
 
                 for(int k=0;k<pointList.getLength();k++) {
                     Node tmpPoint = pointList.item(k);
@@ -181,7 +206,6 @@ public class GMLParser implements ObjectParser{
                     Node tmpSurface = polygonList.item(k);
                     tmpPolygonResult = polygonFromXml(tmpSurface,polygon);
                     if(!tmpPolygonResult.isEmpty()) {
-                        System.out.println("polygon input");
                         ObjInfo tmpObj = new ObjInfo("Polygon",tmpPolygonResult,null);
                         tmpObjInfos.add(tmpObj);
                     }
@@ -192,16 +216,46 @@ public class GMLParser implements ObjectParser{
                     Node tmpCurve = curveList.item(k);
                     tmpCurveResult = curveFromXml(tmpCurve,polygon);
                     if(!tmpCurveResult.isEmpty()) {
-                        System.out.println("curve input");
                         ObjInfo tmpObj = new ObjInfo("Curve",tmpCurveResult,null);
                         tmpObjInfos.add(tmpObj);
                     }
                 }
             }
-            tmpGroup.setObjInfo(tmpObjInfos);
-            tmpGroupInfo.add(tmpGroup);
-            SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo,null);
-            gmlfeatures.add(newobject);
+            if(!tmpObjInfos.isEmpty()) {
+                tmpGroup.setObjInfo(tmpObjInfos);
+                tmpGroupInfo.add(tmpGroup);
+
+                Map<String, String> linkObjects = new HashMap<>();
+                Map<String, Object> attributes = new HashMap<>();
+
+                NodeList linkedNodes = (NodeList) xpath.evaluate(
+                        ".//*[@*[local-name()='href']]",
+                        member,
+                        XPathConstants.NODESET
+                );
+                log.info("linkObjects: " + String.valueOf(linkedNodes.getLength()));
+                for (int j = 0; j < linkedNodes.getLength(); j++) {
+                    Node node = linkedNodes.item(j);
+                    if (node.getNodeType() == Node.ELEMENT_NODE) {
+                        Element elem = (Element) node;
+                        String href = elem.getAttribute("xlink:href"); // ex) "#KR.APPLIC.028"
+                        if (href != null && href.startsWith("#")) {
+                            String refId = href.substring(1); // # 떼기 → KR.APPLIC.028
+                            String relatedType = featureIdTypeMap.get(refId); // 매핑 테이블에서 타입 찾기
+                            if (relatedType != null) {
+                                linkObjects.put(refId, relatedType);
+                            } else {
+                                // 매핑이 없으면 그냥 null이나 "unknown" 넣을 수도 있음
+                                linkObjects.put(refId, "unknown");
+                            }
+                        }
+                    }
+                }
+                attributes.put("linkObjects", linkObjects);
+
+                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo,attributes);
+                gmlfeatures.add(newobject);
+            }
         }
         log.info("total: " + gmlfeatures.size());
         return gmlfeatures;

@@ -16,12 +16,12 @@ public class SearchObject {
     private String id;
     private Map<String, String> valueFields;
     private List<ObjGroupInfo> ObjList;
-    private Map<String,String> Attribute;
+    private Map<String,Object> Attribute;
     //private Map<String, Object> properties;
 
     public SearchObject() { }
 
-    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, List<ObjGroupInfo> objGroupInfos, Map<String, String> attribute) {
+    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, List<ObjGroupInfo> objGroupInfos, Map<String, Object> attribute) {
         this.type = type;
         this.id = id;
         this.ObjList = objGroupInfos;

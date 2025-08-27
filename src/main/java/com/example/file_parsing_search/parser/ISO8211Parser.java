@@ -148,7 +148,7 @@ public class ISO8211Parser implements ObjectParser{
                 ObjGroupInfo tmpObjGroup = new ObjGroupInfo();
                 List<ObjInfo> tmpObjs = new ArrayList<>();
 
-                Map<String, String> tmpAttribute = new HashMap<>();
+                Map<String, Object> tmpAttribute = new HashMap<>();
                 for (int j = 0; j < defn.GetFieldCount(); j++) {
                     FieldDefn fieldDefn = defn.GetFieldDefn(j);
                     String fieldName = fieldDefn.GetNameRef().toLowerCase();
