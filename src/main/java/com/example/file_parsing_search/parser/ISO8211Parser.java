@@ -126,7 +126,7 @@ public class ISO8211Parser implements ObjectParser{
         for (int i = 0; i < ds.GetLayerCount(); i++) {
             Layer layer = ds.GetLayer(i);
             FeatureDefn defn = layer.GetLayerDefn();
-            System.out.println(layer.GetName() + " 필드 개수: " + defn.GetFieldCount());
+            //System.out.println(layer.GetName() + " 필드 개수: " + defn.GetFieldCount());
 
             for (int j = 0; j < defn.GetFieldCount(); j++) {
                 FieldDefn fieldDefn = defn.GetFieldDefn(j);
@@ -204,6 +204,15 @@ public class ISO8211Parser implements ObjectParser{
                                 for (int l = 0; l < poly.getNumInteriorRing(); l++) {
                                     coordsList.add(toRing(poly.getInteriorRingN(l)));
                                 }
+                            }
+                        }
+                        case "MultiPoint" -> {
+                            MultiPoint mp = (MultiPoint) jtsGeom;
+                            for (int k = 0; k < mp.getNumGeometries(); k++) {
+                                Point pt = (Point) mp.getGeometryN(k);
+                                List<List<Double>> pointRing = new ArrayList<>();
+                                pointRing.add(toPair(pt.getCoordinate()));
+                                coordsList.add(pointRing);
                             }
                         }
                         default -> {

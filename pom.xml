@@ -75,7 +75,7 @@
         <dependency>
             <groupId>io.jhdf</groupId>
             <artifactId>jhdf</artifactId>
-            <version>0.9.4</version>
+            <version>0.10.0</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
@@ -86,6 +86,11 @@
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20250517</version>
+        </dependency>
+        <dependency>
+            <groupId>org.gdal</groupId>
+            <artifactId>gdal</artifactId>
+            <version>3.11.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
