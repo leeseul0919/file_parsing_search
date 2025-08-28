@@ -10,6 +10,6 @@ import java.util.List;
 @Setter
 public class ObjGroupInfo {
     private LocalDateTime timePoint;
-    private List<ObjInfo> objInfo;
+    private List<ObjInfo> values;
     public ObjGroupInfo() { }
 }

@@ -140,11 +140,7 @@ public class ISO8211Parser implements ObjectParser{
             while ((feature = layer.GetNextFeature()) != null) {
                 cnt+=1;
 
-                SearchObject tmpSearchObject = new SearchObject();
                 List<ObjGroupInfo> tmpObjGroups = new ArrayList<>();
-
-                tmpSearchObject.setId(String.valueOf(feature.GetFID()));
-                tmpSearchObject.setType(layer.GetName());
 
                 ObjGroupInfo tmpObjGroup = new ObjGroupInfo();
                 List<ObjInfo> tmpObjs = new ArrayList<>();
@@ -155,6 +151,8 @@ public class ISO8211Parser implements ObjectParser{
                     String fieldName = fieldDefn.GetNameRef().toLowerCase();
                     if(attrNames.contains(fieldName)) tmpAttribute.put(fieldDefn.GetNameRef(),feature.GetFieldAsString(j));
                 }
+
+                List<GeometryInfo> tmpGeoInfo = new ArrayList<>();
 
                 Geometry geom = feature.GetGeometryRef();
                 if (geom != null) {
@@ -220,16 +218,11 @@ public class ISO8211Parser implements ObjectParser{
                             log.info("Unhandled geometry type: " + geomType);
                         }
                     }
-                    ObjInfo tmpObj = new ObjInfo(geomType, coordsList, null);
-                    tmpObjs.add(tmpObj);
+                    GeometryInfo tmpGeo = new GeometryInfo(geomType, coordsList);
+                    tmpGeoInfo.add(tmpGeo);
                 }
-                if(!tmpObjs.isEmpty()) {
-                    tmpObjGroup.setTimePoint(null);
-                    tmpObjGroup.setObjInfo(tmpObjs);
-                    tmpObjGroups.add(tmpObjGroup);
-
-                    tmpSearchObject.setObjList(tmpObjGroups);
-                    tmpSearchObject.setAttribute(tmpAttribute);
+                if(!tmpGeoInfo.isEmpty()) {
+                    SearchObject tmpSearchObject = new SearchObject(layer.GetName(),String.valueOf(feature.GetFID()),null,null,tmpAttribute,tmpGeoInfo,null);
                     iso8211features.add(tmpSearchObject);
                 }
                 feature.delete();

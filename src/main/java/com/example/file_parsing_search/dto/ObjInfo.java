@@ -8,13 +8,11 @@ import java.util.List;
 @Getter
 @Setter
 public class ObjInfo {
-    private String geoType;
-    private List<Object> coordinates;
-    private List<Object> values;
+    private List<Integer> Index;
+    private List<Object> Values;
     public ObjInfo() { }
-    public ObjInfo(String geoType,List<Object> coordinates, List<Object> values) {
-        this.geoType = geoType;
-        this.coordinates = coordinates;
-        this.values = values;
+    public ObjInfo(List<Integer> index, List<Object> Values) {
+        this.Index = index;
+        this.Values = Values;
     }
 }

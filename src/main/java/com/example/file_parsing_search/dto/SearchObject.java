@@ -8,27 +8,28 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.Setter;
 
-// Todo: 파싱 결과에 따라 구조 달라질수도
 @Getter
 @Setter
 public class SearchObject {
     private String type;
     private String id;
     private Map<String, String> valueFields;
-    private List<ObjGroupInfo> ObjList;
     private Map<String,Object> Attribute;
+    private List<GeometryInfo> geoInfo;
+    private List<ObjGroupInfo> valueInfo;
     //private Map<String, Object> properties;
 
     public SearchObject() { }
 
-    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, List<ObjGroupInfo> objGroupInfos, Map<String, Object> attribute) {
+    public SearchObject(String type, String id,List<String> fieldList, List<String> uomNameList, Map<String, Object> attribute, List<GeometryInfo> geoInfo, List<ObjGroupInfo> valueInfo) {
         this.type = type;
         this.id = id;
-        this.ObjList = objGroupInfos;
         this.Attribute = attribute;
+        this.geoInfo = geoInfo;
+        this.valueInfo = valueInfo;
 
-        this.valueFields = new HashMap<>();
         if(fieldList!=null && uomNameList!=null) {
+            this.valueFields = new HashMap<>();
             for(int i=0;i<fieldList.size();i++) {
                 this.valueFields.put(fieldList.get(i),uomNameList.get(i));
             }

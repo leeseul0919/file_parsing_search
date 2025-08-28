@@ -157,6 +157,7 @@ public class GMLParser implements ObjectParser{
                 }
             }
 
+
             log.info("member: " + memberList.getLength());
             for (int i=0;i< memberList.getLength();i++) {
                 Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
@@ -167,7 +168,8 @@ public class GMLParser implements ObjectParser{
 
                 List<ObjGroupInfo> tmpGroupInfo = new ArrayList<>();
                 ObjGroupInfo tmpGroup = new ObjGroupInfo();
-                List<ObjInfo> tmpObjInfos = new ArrayList<>();
+                List<GeometryInfo> tmpObjInfos = new ArrayList<>();
+                //GeometryInfo tmpgeoInfo = new GeometryInfo();
 
                 NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
                 //List<GeometryInfo> responseGeo = new ArrayList<>();
@@ -191,9 +193,8 @@ public class GMLParser implements ObjectParser{
                             }
                         }
                         if(!tmpP.isEmpty()) {
-                            //GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
-                            ObjInfo tmpObj = new ObjInfo("Point",tmpP,null);
-                            tmpObjInfos.add(tmpObj);
+                            GeometryInfo tmpgeo = new GeometryInfo("Point",tmpP);
+                            tmpObjInfos.add(tmpgeo);
                         }
                     }
 
@@ -202,8 +203,8 @@ public class GMLParser implements ObjectParser{
                         Node tmpSurface = surfaceList.item(k);
                         tmpSurfaceResult = surfaceFromXml(tmpSurface,polygon);
                         if(!tmpSurfaceResult.isEmpty()) {
-                            ObjInfo tmpObj = new ObjInfo("Surface",tmpSurfaceResult,null);
-                            tmpObjInfos.add(tmpObj);
+                            GeometryInfo tmpgeo = new GeometryInfo("Surface",tmpSurfaceResult);
+                            tmpObjInfos.add(tmpgeo);
                         }
                     }
 
@@ -212,8 +213,8 @@ public class GMLParser implements ObjectParser{
                         Node tmpSurface = polygonList.item(k);
                         tmpPolygonResult = polygonFromXml(tmpSurface,polygon);
                         if(!tmpPolygonResult.isEmpty()) {
-                            ObjInfo tmpObj = new ObjInfo("Polygon",tmpPolygonResult,null);
-                            tmpObjInfos.add(tmpObj);
+                            GeometryInfo tmpgeo = new GeometryInfo("Polygon",tmpPolygonResult);
+                            tmpObjInfos.add(tmpgeo);
                         }
                     }
 
@@ -222,15 +223,12 @@ public class GMLParser implements ObjectParser{
                         Node tmpCurve = curveList.item(k);
                         tmpCurveResult = curveFromXml(tmpCurve,polygon);
                         if(!tmpCurveResult.isEmpty()) {
-                            ObjInfo tmpObj = new ObjInfo("Curve",tmpCurveResult,null);
-                            tmpObjInfos.add(tmpObj);
+                            GeometryInfo tmpgeo = new GeometryInfo("Curve",tmpCurveResult);
+                            tmpObjInfos.add(tmpgeo);
                         }
                     }
                 }
                 if(!tmpObjInfos.isEmpty()) {
-                    tmpGroup.setObjInfo(tmpObjInfos);
-                    tmpGroupInfo.add(tmpGroup);
-
                     Map<String, String> linkObjects = new HashMap<>();
                     Map<String, Object> attributes = new HashMap<>();
 
@@ -240,6 +238,7 @@ public class GMLParser implements ObjectParser{
                             XPathConstants.NODESET
                     );
                     log.info("linkObjects: " + String.valueOf(linkedNodes.getLength()));
+
                     for (int j = 0; j < linkedNodes.getLength(); j++) {
                         Node node = linkedNodes.item(j);
                         if (node.getNodeType() == Node.ELEMENT_NODE) {
@@ -258,7 +257,8 @@ public class GMLParser implements ObjectParser{
                     }
                     attributes.put("linkObjects", linkObjects);
 
-                    SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo,attributes);
+                    //SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,attributes,tmpgeoInfo,null);
+                    SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,attributes,tmpObjInfos,null);
                     gmlfeatures.add(newobject);
                 }
                 else {

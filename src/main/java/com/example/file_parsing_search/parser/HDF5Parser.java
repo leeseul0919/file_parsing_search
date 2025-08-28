@@ -115,11 +115,14 @@ public class HDF5Parser implements ObjectParser{
         Map<String, HDFObj> hdfobjList = new HashMap<>();
 
         try (HdfFile hdfFile = new HdfFile(Paths.get(hdf5FilePath))) {
+            if(hdfFile == null) {
+                throw new CustomException(ErrorCode.FAIL_OPEN_FILE);
+            }
             for (Node node : hdfFile) {
                 if (node instanceof Group && node.getName().equalsIgnoreCase("Group_F")) {
                     Group objectGroup = (Group) node;
                     for (Node subNode : objectGroup) {
-                        if(subNode instanceof Dataset && !node.getName().equalsIgnoreCase("featureCode")) {
+                        if (subNode instanceof Dataset && !node.getName().equalsIgnoreCase("featureCode")) {
                             Dataset groupInfo = (Dataset) subNode;
                             DataType fieldNames = groupInfo.getDataType();
                             HDFObj tmphdfObj = new HDFObj();
@@ -127,7 +130,7 @@ public class HDF5Parser implements ObjectParser{
                             if (fieldNames instanceof CompoundDataType) {
                                 CompoundDataType compoundDataType = (CompoundDataType) fieldNames;
                                 Object rawData = groupInfo.getData();
-                                Map<String,Object> records = (Map<String,Object>) rawData;
+                                Map<String, Object> records = (Map<String, Object>) rawData;
 
                                 List<String> tmpcodeList = new ArrayList<>();
                                 List<String> tmpuomList = new ArrayList<>();
@@ -140,20 +143,19 @@ public class HDF5Parser implements ObjectParser{
                                     if (tmpvalue == null) {
                                         continue;
                                     }
-                                    switch(memberName) {
+                                    switch (memberName) {
                                         case "code":
                                             if (tmpvalue.getClass().isArray()) {
                                                 int len = java.lang.reflect.Array.getLength(tmpvalue);
                                                 for (int i = 0; i < len; i++) {
                                                     Object elem = java.lang.reflect.Array.get(tmpvalue, i);
-                                                    if(elem.getClass().isArray()) {
+                                                    if (elem.getClass().isArray()) {
                                                         int sublen = java.lang.reflect.Array.getLength(elem);
-                                                        for(int j=0;j<sublen;j++) {
+                                                        for (int j = 0; j < sublen; j++) {
                                                             Object subelem = java.lang.reflect.Array.get(elem, j);
                                                             tmpcodeList.add(subelem.toString());
                                                         }
-                                                    }
-                                                    else tmpcodeList.add(elem.toString());
+                                                    } else tmpcodeList.add(elem.toString());
                                                 }
                                             } else {
                                                 tmpcodeList.add(tmpvalue.toString());
@@ -165,15 +167,14 @@ public class HDF5Parser implements ObjectParser{
                                                 for (int i = 0; i < len; i++) {
                                                     Object elem = java.lang.reflect.Array.get(tmpvalue, i);
                                                     //System.out.println("  " + elem);
-                                                    if(elem.getClass().isArray()) {
+                                                    if (elem.getClass().isArray()) {
                                                         int sublen = java.lang.reflect.Array.getLength(elem);
-                                                        for(int j=0;j<sublen;j++) {
+                                                        for (int j = 0; j < sublen; j++) {
                                                             Object subelem = java.lang.reflect.Array.get(elem, j);
                                                             //System.out.println(subelem.toString());
                                                             tmpuomList.add(subelem.toString());
                                                         }
-                                                    }
-                                                    else tmpuomList.add(elem.toString());
+                                                    } else tmpuomList.add(elem.toString());
                                                 }
                                             } else {
                                                 tmpuomList.add(tmpvalue.toString());
@@ -182,20 +183,21 @@ public class HDF5Parser implements ObjectParser{
                                         default:
                                             break;
                                     }
-                                    if(memberName.equals("code") || memberName.equals("uom.name")) {
-                                        tmphdfObj.setObjType(groupInfo.getName());
-                                        tmphdfObj.setCodeList(tmpcodeList);
-                                        tmphdfObj.setUomNameList(tmpuomList);
-                                    }
+
                                 }
-                                hdfobjList.put(groupInfo.getName(),tmphdfObj);
+                                if (!tmpcodeList.isEmpty() || !tmpuomList.isEmpty()) {
+                                    tmphdfObj.setObjType(groupInfo.getName());
+                                    tmphdfObj.setCodeList(tmpcodeList);
+                                    tmphdfObj.setUomNameList(tmpuomList);
+                                    hdfobjList.put(groupInfo.getName(), tmphdfObj);
+                                }
                             }
                         }
                     }
                 }
             }
-
-            if(hdfobjList.isEmpty()) {
+            if(hdfobjList.keySet().isEmpty()) {
+                System.out.println(hdfobjList.keySet());
                 throw new CustomException(ErrorCode.FAIL_READ_GROUP_F);
             }
 
@@ -232,6 +234,9 @@ public class HDF5Parser implements ObjectParser{
                                 Map<String, Object> objIdAttr = printAttributes(objIdGroup);
                                 List<ObjGroupInfo> hdfResults = new ArrayList<>();
 
+                                List<GeometryInfo> responseGeo = new ArrayList<>();
+                                GeometryInfo tmpGeo = new GeometryInfo();
+
                                 int timeInterval = 0;
                                 Object timeIntervalObj = getIgnoreCase(objIdAttr,"timeRecordInterval");
                                 if(timeIntervalObj instanceof Number) {
@@ -242,6 +247,7 @@ public class HDF5Parser implements ObjectParser{
                                 Double gridOriginLon = 0.0;
                                 Double gridSpacingLat = 0.0;
                                 Double gridSpacingLon = 0.0;
+                                List<List<Double>> tmpcoordinates = new ArrayList<>();
 
                                 switch(codingFormat) {
                                     case 1:
@@ -323,6 +329,14 @@ public class HDF5Parser implements ObjectParser{
                                             gridOriginLon = Double.parseDouble(gridOriginLonStr);
                                             gridSpacingLat = Double.parseDouble(gridSpacingLatStr);
                                             gridSpacingLon = Double.parseDouble(gridSpacingLonStr);
+
+                                            List<Double> OriginLatLon = List.of(gridOriginLat,gridOriginLon);
+                                            List<Double> SpacingLatLon = List.of(gridSpacingLat,gridSpacingLon);
+                                            List<List<Double>> tmpGridGeo = List.of(OriginLatLon,SpacingLatLon);
+
+                                            tmpGeo.setType(dataCodingFormats.get(codingFormat));
+                                            tmpGeo.setCoordinates(tmpGridGeo);
+                                            responseGeo.add(tmpGeo);
                                         }
                                         break;
                                     default:
@@ -351,9 +365,12 @@ public class HDF5Parser implements ObjectParser{
                                             if(valueset instanceof Dataset && valueset.getName().equalsIgnoreCase("values")) {
                                                 Dataset valueDataset = (Dataset) valueset;
                                                 Object valuesRaw = valueDataset.getData();
-                                                List<ObjInfo> objInfoList = new ArrayList<>();
+                                                List<ObjInfo> tmpvalues = new ArrayList<>();
 
-                                                if(codingFormat == 2) {
+                                                if(codingFormat == 1) {
+                                                    log.info(String.valueOf(codingFormat));
+                                                }
+                                                else if(codingFormat == 2) {
                                                     if (tmpcodeList.size() == 1) {
                                                         int latSize = 1;
                                                         if (valuesRaw != null && valuesRaw.getClass().isArray()) {
@@ -373,27 +390,23 @@ public class HDF5Parser implements ObjectParser{
 
                                                                     if(polygon.contains(p)) {
                                                                         ObjInfo point = new ObjInfo();
-                                                                        point.setGeoType("Point");
-                                                                        point.setCoordinates(List.of(lat, lon));
+                                                                        point.setIndex(List.of(i,j));
                                                                         point.setValues(List.of(val));
-
-                                                                        objInfoList.add(point);
+                                                                        tmpvalues.add(point);
                                                                     }
                                                                 }
                                                             } else {
                                                                 Object val = castPrimitive(row);
 
                                                                 double lat = gridOriginLat + i * gridSpacingLat;
-                                                                double lon = gridOriginLon;  // j가 없으니까 시작 지점만
+                                                                double lon = gridOriginLon;
                                                                 org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
 
                                                                 if(polygon.contains(p)) {
                                                                     ObjInfo point = new ObjInfo();
-                                                                    point.setGeoType("Point");
-                                                                    point.setCoordinates(List.of(lat, lon));
+                                                                    point.setIndex(List.of(i,0));
                                                                     point.setValues(List.of(val));
-
-                                                                    objInfoList.add(point);
+                                                                    tmpvalues.add(point);
                                                                 }
                                                             }
                                                         }
@@ -438,11 +451,9 @@ public class HDF5Parser implements ObjectParser{
                                                                     org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
                                                                     if(polygon.contains(p)) {
                                                                         ObjInfo point = new ObjInfo();
-                                                                        point.setGeoType("Point");
-                                                                        point.setCoordinates(List.of(lat, lon));
+                                                                        point.setIndex(List.of(i,j));
                                                                         point.setValues(values);
-
-                                                                        objInfoList.add(point);
+                                                                        tmpvalues.add(point);
                                                                     }
                                                                 }
                                                             } else {
@@ -456,20 +467,18 @@ public class HDF5Parser implements ObjectParser{
                                                                 Point p = gf.createPoint(new Coordinate(lon, lat));
                                                                 if(polygon.contains(p)) {
                                                                     ObjInfo point = new ObjInfo();
-                                                                    point.setGeoType("Point");
-                                                                    point.setCoordinates(List.of(lat, lon));
+                                                                    point.setIndex(List.of(i,0));
                                                                     point.setValues(values);
-
-                                                                    objInfoList.add(point);
+                                                                    tmpvalues.add(point);
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 }
-                                                if(!objInfoList.isEmpty()) {
+                                                if(!tmpvalues.isEmpty()) {
                                                     ObjGroupInfo objGroup = new ObjGroupInfo();
                                                     objGroup.setTimePoint(timePoint);
-                                                    objGroup.setObjInfo(objInfoList);
+                                                    objGroup.setValues(tmpvalues);
                                                     hdfResults.add(objGroup);
                                                 }
                                             }
@@ -477,7 +486,7 @@ public class HDF5Parser implements ObjectParser{
                                     }
                                 }
                                 if(!hdfResults.isEmpty()) {
-                                    SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,hdfResults,null);
+                                    SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,null,responseGeo,hdfResults);
                                     hdf5features.add(tmpSearchObj);
                                 }
                             }
