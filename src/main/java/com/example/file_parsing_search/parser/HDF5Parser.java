@@ -118,6 +118,7 @@ public class HDF5Parser implements ObjectParser{
             if(hdfFile == null) {
                 throw new CustomException(ErrorCode.FAIL_OPEN_FILE);
             }
+            System.out.println("file open complete");
             for (Node node : hdfFile) {
                 if (node instanceof Group && node.getName().equalsIgnoreCase("Group_F")) {
                     Group objectGroup = (Group) node;
@@ -126,11 +127,13 @@ public class HDF5Parser implements ObjectParser{
                             Dataset groupInfo = (Dataset) subNode;
                             DataType fieldNames = groupInfo.getDataType();
                             HDFObj tmphdfObj = new HDFObj();
+                            System.out.println("dataset find");
 
                             if (fieldNames instanceof CompoundDataType) {
                                 CompoundDataType compoundDataType = (CompoundDataType) fieldNames;
                                 Object rawData = groupInfo.getData();
                                 Map<String, Object> records = (Map<String, Object>) rawData;
+                                System.out.println("Raw data" + records);
 
                                 List<String> tmpcodeList = new ArrayList<>();
                                 List<String> tmpuomList = new ArrayList<>();
@@ -189,7 +192,8 @@ public class HDF5Parser implements ObjectParser{
                                     tmphdfObj.setObjType(groupInfo.getName());
                                     tmphdfObj.setCodeList(tmpcodeList);
                                     tmphdfObj.setUomNameList(tmpuomList);
-                                    hdfobjList.put(groupInfo.getName(), tmphdfObj);
+                                    hdfobjList.put(groupInfo.getName().toLowerCase(), tmphdfObj);
+                                    System.out.println(groupInfo.getName() + ": " + tmpcodeList + ", " + tmpuomList);
                                 }
                             }
                         }
@@ -197,17 +201,18 @@ public class HDF5Parser implements ObjectParser{
                 }
             }
             if(hdfobjList.keySet().isEmpty()) {
-                System.out.println(hdfobjList.keySet());
                 throw new CustomException(ErrorCode.FAIL_READ_GROUP_F);
             }
+            System.out.println(hdfobjList.keySet());
 
             for (Node node : hdfFile) {
                 if (node instanceof Group && !node.getName().equalsIgnoreCase("Group_F")) {
                     Group objectGroup = (Group) node;
                     String objectType = objectGroup.getName();
                     Map<String, Object> objGroupAttr = printAttributes(objectGroup);
+                    System.out.println(objGroupAttr);
 
-                    int codingFormat = 0;
+                    int codingFormat = 1;
                     Object codingFormatObj = getIgnoreCase(objGroupAttr, "dataCodingFormat");
                     if (codingFormatObj instanceof Number) {
                         codingFormat = ((Number) codingFormatObj).intValue();
@@ -215,6 +220,7 @@ public class HDF5Parser implements ObjectParser{
                     if (codingFormat == 0) {
                         throw new CustomException(ErrorCode.UNKNOWN_CODING_FORMAT);
                     }
+                    log.info("codingFormat: " + codingFormat);
 
                     int dimension = 0;
                     Object dimensionObj = getIgnoreCase(objGroupAttr, "dimension");
@@ -223,7 +229,7 @@ public class HDF5Parser implements ObjectParser{
                     }
                     //System.out.println(node.getName() + " data coding format: " + codingFormat + ", dimension: " + dimension);
 
-                    HDFObj tmpobjType = hdfobjList.get(node.getName());
+                    HDFObj tmpobjType = hdfobjList.get(objectType.toLowerCase());
                     List<String> tmpcodeList = tmpobjType.getCodeList();
                     List<String> tmpuomList = tmpobjType.getUomNameList();
 
@@ -238,8 +244,8 @@ public class HDF5Parser implements ObjectParser{
                                 GeometryInfo tmpGeo = new GeometryInfo();
 
                                 int timeInterval = 0;
-                                Object timeIntervalObj = getIgnoreCase(objIdAttr,"timeRecordInterval");
-                                if(timeIntervalObj instanceof Number) {
+                                Object timeIntervalObj = getIgnoreCase(objIdAttr, "timeRecordInterval");
+                                if (timeIntervalObj instanceof Number) {
                                     timeInterval = ((Number) timeIntervalObj).intValue();
                                 }
 
@@ -250,21 +256,23 @@ public class HDF5Parser implements ObjectParser{
                                 //List<List<Double>> tmpcoordinates = new ArrayList<>();
                                 List<List<Double>> stationCoordinates = new ArrayList<>();
 
-                                switch(codingFormat) {
+                                switch (codingFormat) {
                                     case 1:
-                                        Object numStationObj = getIgnoreCase(objIdAttr,"numberOfStations");
+                                    case 8:
+                                        Object numStationObj = getIgnoreCase(objIdAttr, "numberOfStations");
                                         int numofStations = 0;
-                                        if(numStationObj != null) {
-                                            if(numStationObj instanceof Number) {
+                                        if (numStationObj != null) {
+                                            if (numStationObj instanceof Number) {
                                                 numofStations = ((Number) numStationObj).intValue();
                                             }
                                         }
-                                        if(numofStations > 0) {
-                                            for(Node valuesNode: objIdGroup) {
-                                                if(valuesNode instanceof Group) {
+                                        System.out.println("numOfStations: " + numofStations);
+                                        if (numofStations > 0) {
+                                            for (Node valuesNode : objIdGroup) {
+                                                if (valuesNode instanceof Group) {
                                                     Group valuesGroup = (Group) valuesNode;
-                                                    for(Node datasetNode: valuesGroup) {
-                                                        if(datasetNode instanceof Dataset) {
+                                                    for (Node datasetNode : valuesGroup) {
+                                                        if (datasetNode instanceof Dataset) {
                                                             Dataset coordinatesDataset = (Dataset) datasetNode;
                                                             DataType fieldNames = coordinatesDataset.getDataType();
 
@@ -274,35 +282,39 @@ public class HDF5Parser implements ObjectParser{
                                                             String latKey = null;
                                                             //Set<String> columnNames = new HashSet();
 
-                                                            if(fieldNames instanceof CompoundDataType) {
+                                                            if (fieldNames instanceof CompoundDataType) {
                                                                 String tmplon = null;
                                                                 String tmplat = null;
 
                                                                 CompoundDataType compoundDataType = (CompoundDataType) fieldNames;
                                                                 List<CompoundDataType.CompoundDataMember> members = compoundDataType.getMembers();
-                                                                for(CompoundDataType.CompoundDataMember member:members) {
+                                                                System.out.println("=== members ===");
+                                                                for (CompoundDataType.CompoundDataMember member : members) {
                                                                     String memberName = member.getName();
-                                                                    if(memberName.equalsIgnoreCase("longitude")) {
-                                                                        hasLon=true;
+                                                                    System.out.println("member name: " + memberName);
+                                                                    if (memberName.equalsIgnoreCase("longitude") || memberName.equalsIgnoreCase("long")) {
+                                                                        hasLon = true;
                                                                         tmplon = memberName;
                                                                     }
-                                                                    else if(memberName.equalsIgnoreCase("latitude")) {
-                                                                        hasLat=true;
+                                                                    if (memberName.equalsIgnoreCase("latitude") || memberName.equalsIgnoreCase("lat")) {
+                                                                        hasLat = true;
                                                                         tmplat = memberName;
                                                                     }
                                                                 }
-                                                                if(tmplon != null) lonKey = tmplon;
-                                                                if(tmplat != null) latKey = tmplat;
+                                                                if (tmplon != null) lonKey = tmplon;
+                                                                if (tmplat != null) latKey = tmplat;
                                                             }
-                                                            if(coordinatesDataset.getDimensions()[0] == numofStations && hasLat && hasLon) {
+                                                            //System.out.println(coordinatesDataset.getDimensions()[0]);
+                                                            if (hasLat && hasLon) {
                                                                 try {
+                                                                    System.out.println("Lat: " + hasLat + ", " + "Lon: " + hasLon);
                                                                     Map<String, Object> rawData = (Map<String, Object>) coordinatesDataset.getData();
                                                                     Object lonArr = rawData.get(lonKey);
                                                                     Object latArr = rawData.get(latKey);
                                                                     float[] longitudes = (float[]) lonArr;
                                                                     float[] latitudes = (float[]) latArr;
                                                                     for (int i = 0; i < numofStations; i++) {
-                                                                        stationCoordinates.add(List.of((double) longitudes[i], (double) latitudes[i]));
+                                                                        stationCoordinates.add(List.of(round6((double) longitudes[i]), round6((double) latitudes[i])));
                                                                     }
                                                                 } catch (Exception e) {
                                                                     log.error("Failed to parse coordinates dataset: " + e.getMessage());
@@ -319,20 +331,20 @@ public class HDF5Parser implements ObjectParser{
                                         Object gridOriginLonObj = getIgnoreCase(objIdAttr, "gridOriginLongitude");
                                         Object gridSpacingLatObj = getIgnoreCase(objIdAttr, "gridSpacingLatitudinal");
                                         Object gridSpacingLonObj = getIgnoreCase(objIdAttr, "gridSpacingLongitudinal");
-                                        if(gridOriginLatObj!=null && gridOriginLonObj!=null && gridSpacingLatObj!=null && gridSpacingLonObj!=null) {
+                                        if (gridOriginLatObj != null && gridOriginLonObj != null && gridSpacingLatObj != null && gridSpacingLonObj != null) {
                                             String gridOriginLatStr = gridOriginLatObj.toString();
                                             String gridOriginLonStr = gridOriginLonObj.toString();
                                             String gridSpacingLatStr = gridSpacingLatObj.toString();
                                             String gridSpacingLonStr = gridSpacingLonObj.toString();
 
-                                            gridOriginLat = Double.parseDouble(gridOriginLatStr);
-                                            gridOriginLon = Double.parseDouble(gridOriginLonStr);
-                                            gridSpacingLat = Double.parseDouble(gridSpacingLatStr);
-                                            gridSpacingLon = Double.parseDouble(gridSpacingLonStr);
+                                            gridOriginLat = round6(Double.parseDouble(gridOriginLatStr));
+                                            gridOriginLon = round6(Double.parseDouble(gridOriginLonStr));
+                                            gridSpacingLat = round6(Double.parseDouble(gridSpacingLatStr));
+                                            gridSpacingLon = round6(Double.parseDouble(gridSpacingLonStr));
 
-                                            List<Double> OriginLatLon = List.of(gridOriginLat,gridOriginLon);
-                                            List<Double> SpacingLatLon = List.of(gridSpacingLat,gridSpacingLon);
-                                            List<List<Double>> tmpGridGeo = List.of(OriginLatLon,SpacingLatLon);
+                                            List<Double> OriginLatLon = List.of(gridOriginLat, gridOriginLon);
+                                            List<Double> SpacingLatLon = List.of(gridSpacingLat, gridSpacingLon);
+                                            List<List<Double>> tmpGridGeo = List.of(OriginLatLon, SpacingLatLon);
 
                                             tmpGeo.setType(dataCodingFormats.get(codingFormat));
                                             tmpGeo.setCoordinates(tmpGridGeo);
@@ -342,164 +354,180 @@ public class HDF5Parser implements ObjectParser{
                                     default:
                                         throw new CustomException(ErrorCode.NOT_SUPPORTED_CODING_FORMAT);
                                 }
-
-                                for(Node valuesNode: objIdGroup) {
-                                    if(valuesNode instanceof Group) {
+                                System.out.println("coding format: " + codingFormat);
+                                int orderNode = 0;
+                                for (Node valuesNode : objIdGroup) {
+                                    if (valuesNode instanceof Group) {
                                         Group valueGroup = (Group) valuesNode;
 
                                         Map<String, Object> valueGroupAttr = printAttributes(valuesNode);
                                         LocalDateTime timePoint = null;
-                                        if(!valueGroupAttr.isEmpty()) {
+                                        if (!valueGroupAttr.isEmpty()) {
                                             String timePointStr = (String) getIgnoreCase(valueGroupAttr, "timePoint");
                                             if (timePointStr != null && timePointStr.length() > 15) {
                                                 timePointStr = timePointStr.substring(0, 15);
                                                 log.info(timePointStr);
-                                                if(timePointStr != null) {
+                                                if (timePointStr != null) {
                                                     DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss");
-                                                    timePoint = LocalDateTime.parse(timePointStr,formatter);
+                                                    timePoint = LocalDateTime.parse(timePointStr, formatter);
                                                 }
                                             }
                                         }
 
-                                        for(Node valueset: valueGroup) {
-                                            if(valueset instanceof Dataset && valueset.getName().equalsIgnoreCase("values")) {
+                                        for (Node valueset : valueGroup) {
+                                            if (valueset instanceof Dataset && valueset.getName().equalsIgnoreCase("values")) {
                                                 Dataset valueDataset = (Dataset) valueset;
                                                 Object valuesRaw = valueDataset.getData();
                                                 List<ObjInfo> tmpvalues = new ArrayList<>();
 
-                                                if (tmpcodeList.size() == 1) {
-                                                    int latSize = 1;
-                                                    if (valuesRaw != null && valuesRaw.getClass().isArray()) {
-                                                        latSize = Array.getLength(valuesRaw);
+                                                if (codingFormat == 1) {
+                                                    Map<String, Object> valuesMap = (Map<String, Object>) valuesRaw;
+                                                    List<String> fieldNames = new ArrayList<>(valuesMap.keySet());
+                                                    Object firstCol = valuesMap.get(fieldNames.get(0));
+                                                    int numValues = (firstCol != null && firstCol.getClass().isArray()) ? Array.getLength(firstCol) : 1;
+
+                                                    for (int i = 0; i < numValues; i++) {
+                                                        List<Object> values = new ArrayList<>();
+                                                        for (String code : fieldNames) {
+                                                            Object colData = valuesMap.get(code);
+                                                            if (colData != null && colData.getClass().isArray()) {
+                                                                Object val = Array.getLength(colData) > i ? Array.get(colData, i) : null;
+                                                                values.add(castPrimitive(val));
+                                                            } else {
+                                                                values.add(castPrimitive(colData));
+                                                            }
+                                                        }
+                                                        ObjInfo point = new ObjInfo();
+                                                        point.setValues(values);
+                                                        tmpvalues.add(point);
                                                     }
 
-                                                    for (int i = 0; i < latSize; i++) {
-                                                        Object row = Array.get(valuesRaw, i);
+                                                    System.out.println(tmpvalues.size());
+                                                }
+                                                else if(codingFormat == 2) {
+                                                    if (tmpcodeList.size() == 1) {
+                                                        int latSize = 1;
+                                                        if (valuesRaw != null && valuesRaw.getClass().isArray()) {
+                                                            latSize = Array.getLength(valuesRaw);
+                                                        }
 
-                                                        if (row != null && row.getClass().isArray()) {
-                                                            for (int j = 0; j < Array.getLength(row); j++) {
-                                                                Object val = castPrimitive(Array.get(row, j));
+                                                        for (int i = 0; i < latSize; i++) {
+                                                            Object row = Array.get(valuesRaw, i);
+
+                                                            if (row != null && row.getClass().isArray()) {
+                                                                for (int j = 0; j < Array.getLength(row); j++) {
+                                                                    Object val = castPrimitive(Array.get(row, j));
+
+                                                                    double lat = gridOriginLat + i * gridSpacingLat;
+                                                                    double lon = gridOriginLon + j * gridSpacingLon;
+                                                                    org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
+
+                                                                    if (polygon.contains(p)) {
+                                                                        ObjInfo point = new ObjInfo();
+                                                                        point.setIndex(List.of(i, j));
+                                                                        point.setValues(List.of(val));
+                                                                        tmpvalues.add(point);
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                Object val = castPrimitive(row);
 
                                                                 double lat = gridOriginLat + i * gridSpacingLat;
-                                                                double lon = gridOriginLon + j * gridSpacingLon;
+                                                                double lon = gridOriginLon;
                                                                 org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
 
-                                                                if(polygon.contains(p)) {
+                                                                if (polygon.contains(p)) {
                                                                     ObjInfo point = new ObjInfo();
-                                                                    point.setIndex(List.of(i,j));
+                                                                    point.setIndex(List.of(i, 0));
                                                                     point.setValues(List.of(val));
                                                                     tmpvalues.add(point);
                                                                 }
                                                             }
-                                                        } else {
-                                                            Object val = castPrimitive(row);
-
-                                                            double lat = gridOriginLat + i * gridSpacingLat;
-                                                            double lon = gridOriginLon;
-                                                            org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
-
-                                                            if(polygon.contains(p)) {
-                                                                ObjInfo point = new ObjInfo();
-                                                                point.setIndex(List.of(i,0));
-                                                                point.setValues(List.of(val));
-                                                                tmpvalues.add(point);
-                                                            }
                                                         }
-                                                    }
-                                                } else {
-                                                    Map<String, Object> valuesMap = (Map<String, Object>) valuesRaw;
-                                                    List<String> fieldNames = new ArrayList<>(valuesMap.keySet());
+                                                    } else {
+                                                        Map<String, Object> valuesMap = (Map<String, Object>) valuesRaw;
+                                                        List<String> fieldNames = new ArrayList<>(valuesMap.keySet());
 
-                                                    Object firstCol = valuesMap.get(fieldNames.get(0));
-                                                    int latSize = firstCol.getClass().isArray() ? Array.getLength(firstCol) : 1;
+                                                        Object firstCol = valuesMap.get(fieldNames.get(0));
+                                                        int latSize = firstCol.getClass().isArray() ? Array.getLength(firstCol) : 1;
 
-                                                    for (int i = 0; i < latSize; i++) {
-                                                        List<Object> colSlices = new ArrayList<>();
-                                                        for (String code : fieldNames) {
-                                                            Object colData = valuesMap.get(code);
+                                                        for (int i = 0; i < latSize; i++) {
+                                                            List<Object> colSlices = new ArrayList<>();
+                                                            for (String code : fieldNames) {
+                                                                Object colData = valuesMap.get(code);
 
-                                                            if (colData != null && colData.getClass().isArray()) {
-                                                                Object latRow = Array.getLength(colData) > i ? Array.get(colData, i) : null;
-                                                                colSlices.add(latRow);
-                                                            } else {
-                                                                colSlices.add(colData);
+                                                                if (colData != null && colData.getClass().isArray()) {
+                                                                    Object latRow = Array.getLength(colData) > i ? Array.get(colData, i) : null;
+                                                                    colSlices.add(latRow);
+                                                                } else {
+                                                                    colSlices.add(colData);
+                                                                }
                                                             }
-                                                        }
+                                                            boolean is2D = colSlices.get(0) != null && colSlices.get(0).getClass().isArray();
 
-                                                        boolean is2D = colSlices.get(0) != null && colSlices.get(0).getClass().isArray();
+                                                            if (is2D) {
+                                                                int lonSize = Array.getLength(colSlices.get(0));
 
-                                                        if (is2D) {
-                                                            int lonSize = Array.getLength(colSlices.get(0));
+                                                                for (int j = 0; j < lonSize; j++) {
+                                                                    List<Object> values = new ArrayList<>();
+                                                                    for (Object col : colSlices) {
+                                                                        if (col != null && col.getClass().isArray()) {
+                                                                            Object val = Array.getLength(col) > j ? Array.get(col, j) : null;
+                                                                            values.add(castPrimitive(val));
+                                                                        } else {
+                                                                            values.add(castPrimitive(col));  // 그냥 단일 값이면 그대로 넣음
+                                                                        }
+                                                                    }
 
-                                                            for (int j = 0; j < lonSize; j++) {
-                                                                List<Object> values = new ArrayList<>();
-                                                                for (Object col : colSlices) {
-                                                                    if (col != null && col.getClass().isArray()) {
-                                                                        Object val = Array.getLength(col) > j ? Array.get(col, j) : null;
-                                                                        values.add(castPrimitive(val));
-                                                                    } else {
-                                                                        values.add(castPrimitive(col));  // 그냥 단일 값이면 그대로 넣음
+                                                                    double lat = gridOriginLat + i * gridSpacingLat;
+                                                                    double lon = gridOriginLon + j * gridSpacingLon;
+                                                                    org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
+                                                                    if (polygon.contains(p)) {
+                                                                        ObjInfo point = new ObjInfo();
+                                                                        point.setIndex(List.of(i, j));
+                                                                        point.setValues(values);
+                                                                        tmpvalues.add(point);
                                                                     }
                                                                 }
-
-                                                                double lat = gridOriginLat + i * gridSpacingLat;
-                                                                double lon = gridOriginLon + j * gridSpacingLon;
-                                                                org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(lon, lat));
-                                                                if(polygon.contains(p)) {
-                                                                    ObjInfo point = new ObjInfo();
-                                                                    point.setIndex(List.of(i,j));
-                                                                    point.setValues(values);
-                                                                    tmpvalues.add(point);
+                                                            } else {
+                                                                List<Object> values = new ArrayList<>();
+                                                                for (Object col : colSlices) {
+                                                                    values.add(castPrimitive(col));
                                                                 }
-                                                            }
-                                                        } else {
-                                                            List<Object> values = new ArrayList<>();
-                                                            for (Object col : colSlices) {
-                                                                values.add(castPrimitive(col));
-                                                            }
 
-                                                            double lat = gridOriginLat + i * gridSpacingLat;
-                                                            double lon = gridOriginLon;
-                                                            Point p = gf.createPoint(new Coordinate(lon, lat));
-                                                            if(polygon.contains(p)) {
                                                                 ObjInfo point = new ObjInfo();
-                                                                point.setIndex(List.of(i,0));
                                                                 point.setValues(values);
                                                                 tmpvalues.add(point);
                                                             }
                                                         }
                                                     }
                                                 }
-                                                if(!tmpvalues.isEmpty()) {
+
+                                                if (!tmpvalues.isEmpty()) {
                                                     if (codingFormat == 1) {
-                                                        ObjGroupInfo objGroup = new ObjGroupInfo();
-                                                        objGroup.setTimePoint(timePoint);
-                                                        objGroup.setValues(tmpvalues);
-                                                        hdfResults.add(objGroup);
+                                                        List<Double> tmpGridGeo = stationCoordinates.get(orderNode);
+                                                        org.locationtech.jts.geom.Point p = gf.createPoint(new Coordinate(tmpGridGeo.get(0), tmpGridGeo.get(1)));
 
-                                                        // === Geo 정보 세팅 ===
-                                                        // 현재 group 인덱스를 알아야 stationCoordinates에서 해당 row를 가져올 수 있음
-                                                        int groupIndex = hdfResults.size() - 1;  // 예: 지금까지 들어온 그룹 수 - 1
-                                                        if (stationCoordinates != null && stationCoordinates.size() > groupIndex) {
-                                                            List<Object> tmpGridGeo = Collections.singletonList(stationCoordinates.get(groupIndex));
+                                                        if (polygon.contains(p)) {
+                                                            ObjGroupInfo objGroup = new ObjGroupInfo();
+                                                            objGroup.setTimePoint(timePoint);
+                                                            objGroup.setValues(tmpvalues);
 
-                                                            tmpGeo = new GeometryInfo();
-                                                            tmpGeo.setType("Point");  // codingFormat 1은 지점(Station) 데이터
-                                                            tmpGeo.setCoordinates(tmpGridGeo);    // 현재 groupIndex에 해당하는 좌표 넣기
-                                                            responseGeo.add(tmpGeo);
+                                                            // Create and add the SearchObject immediately
+                                                            List<GeometryInfo> ttt = new ArrayList<>();
+                                                            ttt.add(new GeometryInfo(dataCodingFormats.get(codingFormat), tmpGridGeo));
+
+                                                            // --- NEW: Create a temporary list for this single object ---
+                                                            List<ObjGroupInfo> singleObjList = new ArrayList<>();
+                                                            singleObjList.add(objGroup);
+
+
+                                                            SearchObject tmpSearchObj = new SearchObject(objectType, objIdGroup.getName(), tmpcodeList, tmpuomList, null, ttt, singleObjList);
+                                                            hdf5features.add(tmpSearchObj);
                                                         }
-                                                        SearchObject tmpSearchObj = new SearchObject(
-                                                                objectType,
-                                                                objIdGroup.getName(),
-                                                                tmpcodeList,
-                                                                tmpuomList,
-                                                                null,
-                                                                responseGeo,
-                                                                hdfResults
-                                                        );
-                                                        hdf5features.add(tmpSearchObj);
-                                                    }
-                                                    if(codingFormat == 2) {
+
+                                                        //
+                                                    } else if (codingFormat == 2) {
                                                         ObjGroupInfo objGroup = new ObjGroupInfo();
                                                         objGroup.setTimePoint(timePoint);
                                                         objGroup.setValues(tmpvalues);
@@ -509,9 +537,10 @@ public class HDF5Parser implements ObjectParser{
                                             }
                                         }
                                     }
+                                    orderNode +=1;
                                 }
-                                if(codingFormat == 2 && !hdfResults.isEmpty()) {
-                                    SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,null,responseGeo,hdfResults);
+                                if (codingFormat == 2 && !hdfResults.isEmpty()) {
+                                    SearchObject tmpSearchObj = new SearchObject(objectType, objIdGroup.getName(), tmpcodeList, tmpuomList, null, responseGeo, hdfResults);
                                     hdf5features.add(tmpSearchObj);
                                 }
                             }
@@ -519,6 +548,7 @@ public class HDF5Parser implements ObjectParser{
                     }
                 }
             }
+            System.out.println("result: " + hdf5features.size());
         } catch (Exception e) {
             log.error(e.getMessage());
         }
@@ -568,5 +598,8 @@ public class HDF5Parser implements ObjectParser{
             //System.out.println("    [Attribute] " + attrName + " = " + value);
         }
         return resultAttr;
+    }
+    private static double round6(double value) {
+        return Math.round(value * 1_000_000d) / 1_000_000d;
     }
 }
