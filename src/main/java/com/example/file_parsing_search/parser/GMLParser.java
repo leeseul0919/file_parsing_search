@@ -1,6 +1,8 @@
 package com.example.file_parsing_search.parser;
 
 import com.example.file_parsing_search.dto.*;
+import com.example.file_parsing_search.exception.CustomException;
+import com.example.file_parsing_search.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -107,157 +109,166 @@ public class GMLParser implements ObjectParser{
 
     @Override
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
+        if (request == null || request.getFilePath() == null || request.getFilePath().isEmpty() || polygon == null) {
+            throw new CustomException(ErrorCode.NULL_FILE_PATH);
+        }
+
         GeometryFactory gf = new GeometryFactory();
         XPath xpath = XPathFactory.newInstance().newXPath();
         List<SearchObject> gmlfeatures = new ArrayList<>();
 
-        //서비스 로직에서 요청이 들어온 파일 경로가 있는지 체크하고 request 넘겨주니까 그냥 그대로 request의 getFilePath 사용
         String gmlFilePath = request.getFilePath().replace("\\", "/");
 
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        DocumentBuilder builder = factory.newDocumentBuilder();
-        Document doc = (Document) builder.parse(gmlFilePath);
-        doc.getDocumentElement().normalize();   //모든 요소들을 dom tree 구조로 만들어 두고
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = (Document) builder.parse(gmlFilePath);
+            doc.getDocumentElement().normalize();   //모든 요소들을 dom tree 구조로 만들어 두고
 
-        NodeList imemberList = (NodeList) xpath.evaluate(".//*[local-name()='imember']", doc, XPathConstants.NODESET);
-        Map<String, String> featureIdTypeMap = new HashMap<>();
-        for (int i = 0; i < imemberList.getLength(); i++) {
-            Node imemberNode = imemberList.item(i);
-            if (imemberNode.getNodeType() == Node.ELEMENT_NODE) {
-                Element imemberElement = (Element) imemberNode;
-                NodeList childNodes = imemberElement.getElementsByTagName("*");
-                if (childNodes.getLength() > 0) {
-                    Element firstChild = (Element) childNodes.item(0);
+            NodeList imemberList = (NodeList) xpath.evaluate(".//*[local-name()='imember']", doc, XPathConstants.NODESET);  //여기부터
+            Map<String, String> featureIdTypeMap = new HashMap<>();
+            for (int i = 0; i < imemberList.getLength(); i++) {
+                Node imemberNode = imemberList.item(i);
+                if (imemberNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element imemberElement = (Element) imemberNode;
+                    NodeList childNodes = imemberElement.getElementsByTagName("*");
+                    if (childNodes.getLength() > 0) {
+                        Element firstChild = (Element) childNodes.item(0);
+                        String gmlId = firstChild.getAttribute("gml:id");
+                        String objectType = firstChild.getTagName();
+                        if (!gmlId.isEmpty()) {
+                            featureIdTypeMap.put(gmlId, objectType);
+                        }
+                    }
+                }
+            }
+
+            NodeList memberList = (NodeList) xpath.evaluate(".//*[local-name()='member']", doc, XPathConstants.NODESET);
+            for (int i = 0; i < memberList.getLength(); i++) {
+                Element member = (Element) memberList.item(i);
+                NodeList memberChildNodes = member.getElementsByTagName("*");
+                if (memberChildNodes.getLength() > 0) {
+                    Element firstChild = (Element) memberChildNodes.item(0);
                     String gmlId = firstChild.getAttribute("gml:id");
                     String objectType = firstChild.getTagName();
                     if (!gmlId.isEmpty()) {
-                        featureIdTypeMap.put(gmlId, objectType);
+                        featureIdTypeMap.putIfAbsent(gmlId, objectType);
                     }
                 }
             }
-        }
 
-        NodeList memberList = (NodeList) xpath.evaluate(".//*[local-name()='member']", doc, XPathConstants.NODESET);
-        for (int i = 0; i < memberList.getLength(); i++) {
-            Element member = (Element) memberList.item(i);
-            NodeList memberChildNodes = member.getElementsByTagName("*");
-            if (memberChildNodes.getLength() > 0) {
-                Element firstChild = (Element) memberChildNodes.item(0);
-                String gmlId = firstChild.getAttribute("gml:id");
-                String objectType = firstChild.getTagName();
-                if (!gmlId.isEmpty()) {
-                    featureIdTypeMap.putIfAbsent(gmlId, objectType);
-                }
-            }
-        }
+            log.info("member: " + memberList.getLength());
+            for (int i=0;i< memberList.getLength();i++) {
+                Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
 
-        log.info("member: " + memberList.getLength());
-        for (int i=0;i< memberList.getLength();i++) {
-            Element member = (Element) memberList.item(i);  // 하나씩 돌면서 요소 노드로 바꾸고
+                NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
+                Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
+                String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
 
-            NodeList memberChildNodes = member.getElementsByTagName("*");   //모든 자식노드들 중 요소 노드들을 불러서
-            Element firstChild = (Element) memberChildNodes.item(0);    //그 중 첫번째꺼는 객체 타입
-            String gmlId = firstChild.getAttribute("gml:id");   //gml:id라는 속성 값에 객체 id
+                List<ObjGroupInfo> tmpGroupInfo = new ArrayList<>();
+                ObjGroupInfo tmpGroup = new ObjGroupInfo();
+                List<ObjInfo> tmpObjInfos = new ArrayList<>();
 
-            List<ObjGroupInfo> tmpGroupInfo = new ArrayList<>();
-            ObjGroupInfo tmpGroup = new ObjGroupInfo();
-            List<ObjInfo> tmpObjInfos = new ArrayList<>();
+                NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
+                //List<GeometryInfo> responseGeo = new ArrayList<>();
+                for(int j=0;j< geoList.getLength();j++) {
+                    Element geoChild = (Element) geoList.item(j);
+                    NodeList pointList = (NodeList) xpath.evaluate(".//*[local-name()='Point']", geoChild, XPathConstants.NODESET);
+                    NodeList surfaceList = (NodeList) xpath.evaluate(".//*[local-name()='Surface']", geoChild, XPathConstants.NODESET);
+                    NodeList polygonList = (NodeList) xpath.evaluate(".//*[local-name()='Polygon']", geoChild, XPathConstants.NODESET);
+                    NodeList curveList = (NodeList) xpath.evaluate(".//*[local-name()='Curve']", geoChild, XPathConstants.NODESET);
 
-            NodeList geoList = (NodeList) xpath.evaluate(".//*[local-name()='geometry']", member, XPathConstants.NODESET); //geometry 노드들을 불러서
-            //List<GeometryInfo> responseGeo = new ArrayList<>();
-            for(int j=0;j< geoList.getLength();j++) {
-                Element geoChild = (Element) geoList.item(j);
-                NodeList pointList = (NodeList) xpath.evaluate(".//*[local-name()='Point']", geoChild, XPathConstants.NODESET);
-                NodeList surfaceList = (NodeList) xpath.evaluate(".//*[local-name()='Surface']", geoChild, XPathConstants.NODESET);
-                NodeList polygonList = (NodeList) xpath.evaluate(".//*[local-name()='Polygon']", geoChild, XPathConstants.NODESET);
-                NodeList curveList = (NodeList) xpath.evaluate(".//*[local-name()='Curve']", geoChild, XPathConstants.NODESET);
-
-                for(int k=0;k<pointList.getLength();k++) {
-                    Node tmpPoint = pointList.item(k);
-                    Node pointNode = (Node) xpath.evaluate(".//*[local-name()='pos']",tmpPoint,XPathConstants.NODE);
-                    List<Object> tmpP = new ArrayList<>();
-                    if(pointNode != null) {
-                        String[] coords = pointNode.getTextContent().trim().split("\\s+");
-                        Point p = gf.createPoint(new Coordinate(Double.parseDouble(coords[0]), Double.parseDouble(coords[1])));
-                        if(polygon.contains(p)) {
-                            tmpP.add(Double.parseDouble(coords[0]));
-                            tmpP.add(Double.parseDouble(coords[1]));
+                    for(int k=0;k<pointList.getLength();k++) {
+                        Node tmpPoint = pointList.item(k);
+                        Node pointNode = (Node) xpath.evaluate(".//*[local-name()='pos']",tmpPoint,XPathConstants.NODE);
+                        List<Object> tmpP = new ArrayList<>();
+                        if(pointNode != null) {
+                            String[] coords = pointNode.getTextContent().trim().split("\\s+");
+                            Point p = gf.createPoint(new Coordinate(Double.parseDouble(coords[0]), Double.parseDouble(coords[1])));
+                            if(polygon.contains(p)) {
+                                tmpP.add(Double.parseDouble(coords[0]));
+                                tmpP.add(Double.parseDouble(coords[1]));
+                            }
+                        }
+                        if(!tmpP.isEmpty()) {
+                            //GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
+                            ObjInfo tmpObj = new ObjInfo("Point",tmpP,null);
+                            tmpObjInfos.add(tmpObj);
                         }
                     }
-                    if(!tmpP.isEmpty()) {
-                        //GeometryInfo tmpresponse = new GeometryInfo("Point",tmpP);
-                        ObjInfo tmpObj = new ObjInfo("Point",tmpP,null);
-                        tmpObjInfos.add(tmpObj);
+
+                    for(int k=0;k<surfaceList.getLength();k++) {
+                        List<Object> tmpSurfaceResult = new ArrayList<>();
+                        Node tmpSurface = surfaceList.item(k);
+                        tmpSurfaceResult = surfaceFromXml(tmpSurface,polygon);
+                        if(!tmpSurfaceResult.isEmpty()) {
+                            ObjInfo tmpObj = new ObjInfo("Surface",tmpSurfaceResult,null);
+                            tmpObjInfos.add(tmpObj);
+                        }
+                    }
+
+                    for(int k=0;k<polygonList.getLength();k++) {
+                        List<Object> tmpPolygonResult = new ArrayList<>();
+                        Node tmpSurface = polygonList.item(k);
+                        tmpPolygonResult = polygonFromXml(tmpSurface,polygon);
+                        if(!tmpPolygonResult.isEmpty()) {
+                            ObjInfo tmpObj = new ObjInfo("Polygon",tmpPolygonResult,null);
+                            tmpObjInfos.add(tmpObj);
+                        }
+                    }
+
+                    for(int k=0;k<curveList.getLength();k++) {
+                        List<Object> tmpCurveResult = new ArrayList<>();
+                        Node tmpCurve = curveList.item(k);
+                        tmpCurveResult = curveFromXml(tmpCurve,polygon);
+                        if(!tmpCurveResult.isEmpty()) {
+                            ObjInfo tmpObj = new ObjInfo("Curve",tmpCurveResult,null);
+                            tmpObjInfos.add(tmpObj);
+                        }
                     }
                 }
+                if(!tmpObjInfos.isEmpty()) {
+                    tmpGroup.setObjInfo(tmpObjInfos);
+                    tmpGroupInfo.add(tmpGroup);
 
-                for(int k=0;k<surfaceList.getLength();k++) {
-                    List<Object> tmpSurfaceResult = new ArrayList<>();
-                    Node tmpSurface = surfaceList.item(k);
-                    tmpSurfaceResult = surfaceFromXml(tmpSurface,polygon);
-                    if(!tmpSurfaceResult.isEmpty()) {
-                        ObjInfo tmpObj = new ObjInfo("Surface",tmpSurfaceResult,null);
-                        tmpObjInfos.add(tmpObj);
-                    }
-                }
+                    Map<String, String> linkObjects = new HashMap<>();
+                    Map<String, Object> attributes = new HashMap<>();
 
-                for(int k=0;k<polygonList.getLength();k++) {
-                    List<Object> tmpPolygonResult = new ArrayList<>();
-                    Node tmpSurface = polygonList.item(k);
-                    tmpPolygonResult = polygonFromXml(tmpSurface,polygon);
-                    if(!tmpPolygonResult.isEmpty()) {
-                        ObjInfo tmpObj = new ObjInfo("Polygon",tmpPolygonResult,null);
-                        tmpObjInfos.add(tmpObj);
-                    }
-                }
-
-                for(int k=0;k<curveList.getLength();k++) {
-                    List<Object> tmpCurveResult = new ArrayList<>();
-                    Node tmpCurve = curveList.item(k);
-                    tmpCurveResult = curveFromXml(tmpCurve,polygon);
-                    if(!tmpCurveResult.isEmpty()) {
-                        ObjInfo tmpObj = new ObjInfo("Curve",tmpCurveResult,null);
-                        tmpObjInfos.add(tmpObj);
-                    }
-                }
-            }
-            if(!tmpObjInfos.isEmpty()) {
-                tmpGroup.setObjInfo(tmpObjInfos);
-                tmpGroupInfo.add(tmpGroup);
-
-                Map<String, String> linkObjects = new HashMap<>();
-                Map<String, Object> attributes = new HashMap<>();
-
-                NodeList linkedNodes = (NodeList) xpath.evaluate(
-                        ".//*[@*[local-name()='href']]",
-                        member,
-                        XPathConstants.NODESET
-                );
-                log.info("linkObjects: " + String.valueOf(linkedNodes.getLength()));
-                for (int j = 0; j < linkedNodes.getLength(); j++) {
-                    Node node = linkedNodes.item(j);
-                    if (node.getNodeType() == Node.ELEMENT_NODE) {
-                        Element elem = (Element) node;
-                        String href = elem.getAttribute("xlink:href"); // ex) "#KR.APPLIC.028"
-                        if (href != null && href.startsWith("#")) {
-                            String refId = href.substring(1); // # 떼기 → KR.APPLIC.028
-                            String relatedType = featureIdTypeMap.get(refId); // 매핑 테이블에서 타입 찾기
-                            if (relatedType != null) {
-                                linkObjects.put(refId, relatedType);
-                            } else {
-                                // 매핑이 없으면 그냥 null이나 "unknown" 넣을 수도 있음
-                                linkObjects.put(refId, "unknown");
+                    NodeList linkedNodes = (NodeList) xpath.evaluate(
+                            ".//*[@*[local-name()='href']]",
+                            member,
+                            XPathConstants.NODESET
+                    );
+                    log.info("linkObjects: " + String.valueOf(linkedNodes.getLength()));
+                    for (int j = 0; j < linkedNodes.getLength(); j++) {
+                        Node node = linkedNodes.item(j);
+                        if (node.getNodeType() == Node.ELEMENT_NODE) {
+                            Element elem = (Element) node;
+                            String href = elem.getAttribute("xlink:href");
+                            if (href != null && href.startsWith("#")) {
+                                String refId = href.substring(1);
+                                String relatedType = featureIdTypeMap.get(refId);
+                                if (relatedType != null) {
+                                    linkObjects.put(refId, relatedType);
+                                } else {
+                                    linkObjects.put(refId, "unknown");
+                                }
                             }
                         }
                     }
-                }
-                attributes.put("linkObjects", linkObjects);
+                    attributes.put("linkObjects", linkObjects);
 
-                SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo,attributes);
-                gmlfeatures.add(newobject);
+                    SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,tmpGroupInfo,attributes);
+                    gmlfeatures.add(newobject);
+                }
+                else {
+                    throw new CustomException(ErrorCode.NO_RESULTS_FOUND);
+                }
             }
+            log.info("total: " + gmlfeatures.size());
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            throw new CustomException(ErrorCode.FAIL_READ_XML);
         }
-        log.info("total: " + gmlfeatures.size());
         return gmlfeatures;
     }
 

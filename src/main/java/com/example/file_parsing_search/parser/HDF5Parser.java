@@ -1,6 +1,8 @@
 package com.example.file_parsing_search.parser;
 
 import com.example.file_parsing_search.dto.*;
+import com.example.file_parsing_search.exception.CustomException;
+import com.example.file_parsing_search.exception.ErrorCode;
 import com.fasterxml.jackson.core.util.Separators;
 import io.jhdf.HdfFile;
 import io.jhdf.api.Attribute;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 import javax.lang.model.util.Elements;
 import java.awt.*;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
@@ -50,17 +53,21 @@ public class HDF5Parser implements ObjectParser{
 
     @Override
     public CapabilityDto getcapability(String filePath, String fileType) {
-        List<String> objectList = new ArrayList<>();
-        List<List<Double>> fileBBOX = new ArrayList<>();
-        String westbbox = "0.0";
-        String southbbox = "0.0";
-        String eastbbox = "0.0";
-        String northbbox = "0.0";
-        String epsg = "";
+        if (filePath == null || filePath.isEmpty()) {
+            log.error("Null File : " + filePath);
+        }
 
         // --- 파일 파싱 되었을 때 여기로 변경 ---
         try (HdfFile hdfFile = new HdfFile(Paths.get(filePath))) {
             Map<String, Object> fileAttr = printAttributes(hdfFile);
+            List<String> objectList = new ArrayList<>();
+            List<List<Double>> fileBBOX = new ArrayList<>();
+
+            String westbbox = "0.0";
+            String southbbox = "0.0";
+            String eastbbox = "0.0";
+            String northbbox = "0.0";
+            String epsg = "";
 
             Object objectCRSRef = getIgnoreCase(fileAttr,"horizontalDatumReference");
             Object objectCRS = getIgnoreCase(fileAttr, "horizontalDatumValue");
@@ -68,6 +75,7 @@ public class HDF5Parser implements ObjectParser{
             Object objectsouth = getIgnoreCase(fileAttr, "southBoundLatitude");
             Object objecteast = getIgnoreCase(fileAttr, "eastBoundLongitude");
             Object objectnorth = getIgnoreCase(fileAttr, "northBoundLatitude");
+
             if(objectCRS != null) epsg = objectCRSRef.toString() + ":" + objectCRS.toString();
             if(objectwest != null) westbbox = objectwest.toString();
             if(objectsouth != null) southbbox = objectsouth.toString();
@@ -97,6 +105,10 @@ public class HDF5Parser implements ObjectParser{
 
     @Override
     public List<SearchObject> parse(GetObjectRequestDto request, Polygon polygon) throws Exception {
+        if (request == null || request.getFilePath() == null || request.getFilePath().isEmpty() || polygon == null) {
+            throw new CustomException(ErrorCode.NULL_FILE_PATH);
+        }
+
         GeometryFactory gf = new GeometryFactory();
         List<SearchObject> hdf5features = new ArrayList<>();
         String hdf5FilePath = request.getFilePath().replace("\\", "/");
@@ -105,14 +117,11 @@ public class HDF5Parser implements ObjectParser{
         try (HdfFile hdfFile = new HdfFile(Paths.get(hdf5FilePath))) {
             for (Node node : hdfFile) {
                 if (node instanceof Group && node.getName().equalsIgnoreCase("Group_F")) {
-                    //System.out.println("group f find");
-
                     Group objectGroup = (Group) node;
                     for (Node subNode : objectGroup) {
                         if(subNode instanceof Dataset && !node.getName().equalsIgnoreCase("featureCode")) {
                             Dataset groupInfo = (Dataset) subNode;
                             DataType fieldNames = groupInfo.getDataType();
-                            //System.out.println(groupInfo.getName());
                             HDFObj tmphdfObj = new HDFObj();
 
                             if (fieldNames instanceof CompoundDataType) {
@@ -126,7 +135,6 @@ public class HDF5Parser implements ObjectParser{
                                 for (CompoundDataType.CompoundDataMember member : members) {
                                     String rawmemName = member.getName();
                                     String memberName = rawmemName.toLowerCase();
-                                    //System.out.println("Member: " + memberName);
 
                                     Object tmpvalue = records.get(rawmemName);
                                     if (tmpvalue == null) {
@@ -142,14 +150,12 @@ public class HDF5Parser implements ObjectParser{
                                                         int sublen = java.lang.reflect.Array.getLength(elem);
                                                         for(int j=0;j<sublen;j++) {
                                                             Object subelem = java.lang.reflect.Array.get(elem, j);
-                                                            //System.out.println(subelem.toString());
                                                             tmpcodeList.add(subelem.toString());
                                                         }
                                                     }
                                                     else tmpcodeList.add(elem.toString());
                                                 }
                                             } else {
-                                                // 단일 값인 경우
                                                 tmpcodeList.add(tmpvalue.toString());
                                             }
                                             break;
@@ -170,13 +176,10 @@ public class HDF5Parser implements ObjectParser{
                                                     else tmpuomList.add(elem.toString());
                                                 }
                                             } else {
-                                                // 단일 값인 경우
-                                                //System.out.println("  " + tmpvalue.toString());
                                                 tmpuomList.add(tmpvalue.toString());
                                             }
                                             break;
                                         default:
-                                            //System.out.println(memberName);
                                             break;
                                     }
                                     if(memberName.equals("code") || memberName.equals("uom.name")) {
@@ -185,7 +188,6 @@ public class HDF5Parser implements ObjectParser{
                                         tmphdfObj.setUomNameList(tmpuomList);
                                     }
                                 }
-                                //groupInfo
                                 hdfobjList.put(groupInfo.getName(),tmphdfObj);
                             }
                         }
@@ -193,9 +195,12 @@ public class HDF5Parser implements ObjectParser{
                 }
             }
 
+            if(hdfobjList.isEmpty()) {
+                throw new CustomException(ErrorCode.FAIL_READ_GROUP_F);
+            }
+
             for (Node node : hdfFile) {
                 if (node instanceof Group && !node.getName().equalsIgnoreCase("Group_F")) {
-                    //System.out.println("group f find");
                     Group objectGroup = (Group) node;
                     String objectType = objectGroup.getName();
                     Map<String, Object> objGroupAttr = printAttributes(objectGroup);
@@ -205,13 +210,16 @@ public class HDF5Parser implements ObjectParser{
                     if (codingFormatObj instanceof Number) {
                         codingFormat = ((Number) codingFormatObj).intValue();
                     }
+                    if (codingFormat == 0) {
+                        throw new CustomException(ErrorCode.UNKNOWN_CODING_FORMAT);
+                    }
 
                     int dimension = 0;
                     Object dimensionObj = getIgnoreCase(objGroupAttr, "dimension");
                     if (dimensionObj instanceof Number) {
                         dimension = ((Number) dimensionObj).intValue();
                     }
-                    System.out.println(node.getName() + " data coding format: " + codingFormat + ", dimension: " + dimension);
+                    //System.out.println(node.getName() + " data coding format: " + codingFormat + ", dimension: " + dimension);
 
                     HDFObj tmpobjType = hdfobjList.get(node.getName());
                     List<String> tmpcodeList = tmpobjType.getCodeList();
@@ -318,8 +326,7 @@ public class HDF5Parser implements ObjectParser{
                                         }
                                         break;
                                     default:
-                                        log.error("지원하지 않는 인코딩 형식");
-                                        break;
+                                        throw new CustomException(ErrorCode.NOT_SUPPORTED_CODING_FORMAT);
                                 }
 
                                 for(Node valuesNode: objIdGroup) {
@@ -343,14 +350,7 @@ public class HDF5Parser implements ObjectParser{
                                         for(Node valueset: valueGroup) {
                                             if(valueset instanceof Dataset && valueset.getName().equalsIgnoreCase("values")) {
                                                 Dataset valueDataset = (Dataset) valueset;
-                                                //List<Object> parsedValues = new ArrayList<>();
-
                                                 Object valuesRaw = valueDataset.getData();
-
-                                                //컬럼이 한개인 상태랑 여러개인 상태 나눠서?
-                                                //한개면 그냥 단순 배열일거고 여러개면 codeList에서 하나씩 꺼내서 컬럼명으로 꺼내야 하나?
-                                                //꺼낼때 tmpobjType에서 dataTypeList에서 확인하면서 꺼내야 함
-
                                                 List<ObjInfo> objInfoList = new ArrayList<>();
 
                                                 if(codingFormat == 2) {
@@ -446,7 +446,6 @@ public class HDF5Parser implements ObjectParser{
                                                                     }
                                                                 }
                                                             } else {
-                                                                // 1차원 배열 or 단일 값 처리
                                                                 List<Object> values = new ArrayList<>();
                                                                 for (Object col : colSlices) {
                                                                     values.add(castPrimitive(col));
@@ -467,25 +466,31 @@ public class HDF5Parser implements ObjectParser{
                                                         }
                                                     }
                                                 }
-                                                ObjGroupInfo objGroup = new ObjGroupInfo();
-                                                objGroup.setTimePoint(timePoint);  // timePoint가 null일 수도 있음
-                                                objGroup.setObjInfo(objInfoList);
-                                                hdfResults.add(objGroup);
+                                                if(!objInfoList.isEmpty()) {
+                                                    ObjGroupInfo objGroup = new ObjGroupInfo();
+                                                    objGroup.setTimePoint(timePoint);
+                                                    objGroup.setObjInfo(objInfoList);
+                                                    hdfResults.add(objGroup);
+                                                }
                                             }
                                         }
                                     }
                                 }
-                                SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,hdfResults,null);
-                                hdf5features.add(tmpSearchObj);
+                                if(!hdfResults.isEmpty()) {
+                                    SearchObject tmpSearchObj = new SearchObject(objectType,objIdGroup.getName(),tmpcodeList,tmpuomList,hdfResults,null);
+                                    hdf5features.add(tmpSearchObj);
+                                }
                             }
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            log.error(e.getMessage());
         }
-
+        if(hdf5features.isEmpty()) {
+            throw new CustomException(ErrorCode.NO_RESULTS_FOUND);
+        }
         return hdf5features;
     }
     private Object castPrimitive(Object val){

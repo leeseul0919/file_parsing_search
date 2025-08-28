@@ -1,6 +1,8 @@
 package com.example.file_parsing_search.parser;
 
 import com.example.file_parsing_search.dto.*;
+import com.example.file_parsing_search.exception.CustomException;
+import com.example.file_parsing_search.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.gdal.ogr.Geometry;
@@ -39,17 +41,16 @@ public class ISO8211Parser implements ObjectParser{
         String normalizedPath = filePath.replace("\\", "/");
         log.info(filePath);
         if (filePath.length() < 1) {
-            System.out.println("Usage: java ReadISO8211 <iso8211_file>");
+            log.info("Usage: java ReadISO8211 <iso8211_file>");
             return null;
         }
 
         DataSource ds = ogr.Open(filePath, 0); // 0 = read-only
         if (ds == null) {
-            System.err.println("Failed to open file: " + filePath);
+            log.info("Failed to open file: " + filePath);
             return null;
         }
-
-        System.out.println("Opened file: " + filePath);
+        log.info("Opened file: " + filePath);
 
         double globalMinX = Double.MAX_VALUE;
         double globalMinY = Double.MAX_VALUE;
@@ -77,14 +78,12 @@ public class ISO8211Parser implements ObjectParser{
                 objectTypes.add(layerName);
             }
 
-            if (CRS.equals("unknown")) {
-                SpatialReference sr = layer.GetSpatialRef();
-                if (sr != null) {
-                    String name = sr.GetAuthorityName(null);
-                    String code = sr.GetAuthorityCode(null);
-                    if (name != null && code != null) {
-                        CRS = name + ":" + code;
-                    }
+            SpatialReference sr = layer.GetSpatialRef();
+            if (sr != null) {
+                String name = sr.GetAuthorityName(null);
+                String code = sr.GetAuthorityCode(null);
+                if (name != null && code != null) {
+                    CRS = name + ":" + code;
                 }
             }
 
@@ -113,11 +112,15 @@ public class ISO8211Parser implements ObjectParser{
         List<SearchObject> iso8211features = new ArrayList<>();
         int cnt = 0;
 
+        if (request == null || request.getFilePath() == null || request.getFilePath().isEmpty() || polygon == null) {
+            throw new CustomException(ErrorCode.NULL_FILE_PATH);
+        }
+
         String isoFilePath = request.getFilePath().replace("\\", "/");
         DataSource ds = ogr.Open(isoFilePath, 0); // 0 = read-only
         if (ds == null) {
             log.info("파일 열기 실패: " + isoFilePath);
-            return null;
+            throw new CustomException(ErrorCode.FAIL_OPEN_FILE);
         }
 
         //log.info("레이어 개수: " + ds.GetLayerCount());
@@ -125,14 +128,12 @@ public class ISO8211Parser implements ObjectParser{
 
         for (int i = 0; i < ds.GetLayerCount(); i++) {
             Layer layer = ds.GetLayer(i);
-            FeatureDefn defn = layer.GetLayerDefn();
-            //System.out.println(layer.GetName() + " 필드 개수: " + defn.GetFieldCount());
-
-            for (int j = 0; j < defn.GetFieldCount(); j++) {
-                FieldDefn fieldDefn = defn.GetFieldDefn(j);
+            if (layer == null) {
+                log.warn("Layer at index {} is null. Skipping.", i);
+                continue;
             }
 
-            // 실제 피처 값 출력
+            FeatureDefn defn = layer.GetLayerDefn();
             layer.ResetReading();
             Feature feature;
 
@@ -216,7 +217,7 @@ public class ISO8211Parser implements ObjectParser{
                             }
                         }
                         default -> {
-                            System.out.println("Unhandled geometry type: " + geomType);
+                            log.info("Unhandled geometry type: " + geomType);
                         }
                     }
                     ObjInfo tmpObj = new ObjInfo(geomType, coordsList, null);
@@ -236,6 +237,9 @@ public class ISO8211Parser implements ObjectParser{
         }
         ds.delete();
         log.info("parsing end: "+cnt + ", result cnt: " + iso8211features.size());
+        if(iso8211features.isEmpty()) {
+            throw new CustomException(ErrorCode.NO_RESULTS_FOUND);
+        }
         return iso8211features;
     }
     private static List<Double> toPair(Coordinate c) {

@@ -5,6 +5,8 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.GetObjectResponseDto;
 import com.example.file_parsing_search.dto.ResponseDto;
+import com.example.file_parsing_search.exception.CustomException;
+import com.example.file_parsing_search.exception.ErrorCode;
 import com.example.file_parsing_search.service.FileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -68,40 +70,29 @@ public class FileController {
 
     @Operation(summary = "Search Object Info", description = "특정 파일의 특정 범위에 있는 객체들 정보를 반환")
     @PostMapping("/getObject")
-    public ResponseEntity<ResponseDto<?>> getObject(@Valid @RequestBody GetObjectRequestDto requestDto) {
+    public ResponseEntity<ResponseDto<?>> getObject(@Valid @RequestBody GetObjectRequestDto requestDto) throws Exception {
+        if (requestDto == null || requestDto.getFilePath() == null || requestDto.getFilePath().isEmpty() || requestDto.getGeometryInfo() == null) {
+            throw new CustomException(ErrorCode.NULL_FILE_PATH);
+        }
+
         LocalDateTime requestTime = LocalDateTime.now();
         String requestBodyJson = toJsonSafe(requestDto);
         long serviceStart = System.currentTimeMillis();
 
-        try {
-            GetObjectResponseDto getobjectResponse = fileService.getObjectResponseDto(requestDto);  // Todo:
-            log.info("getObject process complete");
+        GetObjectResponseDto getobjectResponse = fileService.getObjectResponseDto(requestDto);
+        log.info("getObject process complete");
 
-            long serviceEnd = System.currentTimeMillis();
-            long serviceDurationMs = (long) (serviceEnd - serviceStart);
+        long serviceEnd = System.currentTimeMillis();
+        long serviceDurationMs = (long) (serviceEnd - serviceStart);
 
-            getobjectResponse.setSearchTime(serviceDurationMs);
-            ResponseDto<?> responseDto = ResponseDto.success(getobjectResponse);
-            String responseBodyJson = toJsonSafe(responseDto);
-            LocalDateTime responseTime = LocalDateTime.now();
-            log.info("Success to search file");
+        getobjectResponse.setSearchTime(serviceDurationMs);
+        ResponseDto<?> responseDto = ResponseDto.success(getobjectResponse);
+        String responseBodyJson = toJsonSafe(responseDto);
+        LocalDateTime responseTime = LocalDateTime.now();
+        log.info("Success to search file");
 
-            saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),serviceDurationMs, requestBodyJson,responseBodyJson);
-            return ResponseEntity.ok(responseDto);
-        } catch (Exception e) {
-            log.error("Fail to search file - {}" ,e.getMessage(), e);
-
-            long serviceEnd = System.currentTimeMillis();
-            long serviceDurationMs = (long) (serviceEnd - serviceStart);
-
-            ResponseDto<?> errorDto = ResponseDto.fail(e.getMessage(), Collections.emptyList());
-            String responseBodyJson = toJsonSafe(errorDto);
-            LocalDateTime errorTime = LocalDateTime.now();
-            log.error("Fail to make response - {}" ,e.getMessage(), e);
-
-            saveHistory("/getObject", "POST", requestTime, errorTime, HttpStatus.INTERNAL_SERVER_ERROR.value(), serviceDurationMs, requestBodyJson, responseBodyJson);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorDto);
-        }
+        saveHistory("/getObject","POST",requestTime,responseTime,HttpStatus.OK.value(),serviceDurationMs, requestBodyJson,responseBodyJson);
+        return ResponseEntity.ok(responseDto);
     }
 
     //파일 추가/삭제 했을 때 다시 파일 목록 로드, 임의로 만든 api
