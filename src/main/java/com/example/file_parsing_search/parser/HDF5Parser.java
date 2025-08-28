@@ -342,8 +342,8 @@ public class HDF5Parser implements ObjectParser{
                                             gridSpacingLat = round6(Double.parseDouble(gridSpacingLatStr));
                                             gridSpacingLon = round6(Double.parseDouble(gridSpacingLonStr));
 
-                                            List<Double> OriginLatLon = List.of(gridOriginLat, gridOriginLon);
-                                            List<Double> SpacingLatLon = List.of(gridSpacingLat, gridSpacingLon);
+                                            List<Double> OriginLatLon = List.of(gridOriginLon, gridOriginLat);
+                                            List<Double> SpacingLatLon = List.of(gridSpacingLon, gridSpacingLat);
                                             List<List<Double>> tmpGridGeo = List.of(OriginLatLon, SpacingLatLon);
 
                                             tmpGeo.setType(dataCodingFormats.get(codingFormat));
