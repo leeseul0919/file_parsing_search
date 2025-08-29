@@ -148,10 +148,11 @@ public class ISO8211Parser implements ObjectParser{
                 Map<String, Object> tmpAttribute = new HashMap<>();
                 for (int j = 0; j < defn.GetFieldCount(); j++) {
                     FieldDefn fieldDefn = defn.GetFieldDefn(j);
-                    String fieldName = fieldDefn.GetNameRef().toLowerCase();
-                    if(attrNames.contains(fieldName)) tmpAttribute.put(fieldDefn.GetNameRef(),feature.GetFieldAsString(j));
+                    String fieldName = fieldDefn.GetNameRef();
+                    if (feature.IsFieldSet(j)) {
+                        tmpAttribute.put(fieldName, feature.GetFieldAsString(j));
+                    }
                 }
-
                 List<GeometryInfo> tmpGeoInfo = new ArrayList<>();
 
                 Geometry geom = feature.GetGeometryRef();

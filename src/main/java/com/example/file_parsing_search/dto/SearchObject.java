@@ -1,9 +1,6 @@
 package com.example.file_parsing_search.dto;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -29,7 +26,7 @@ public class SearchObject {
         this.valueInfo = valueInfo;
 
         if(fieldList!=null && uomNameList!=null) {
-            this.valueFields = new HashMap<>();
+            this.valueFields = new LinkedHashMap<>();
             for(int i=0;i<fieldList.size();i++) {
                 this.valueFields.put(fieldList.get(i),uomNameList.get(i));
             }

@@ -17,6 +17,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Component;
 
 import javax.lang.model.util.Elements;
@@ -112,7 +113,7 @@ public class HDF5Parser implements ObjectParser{
         GeometryFactory gf = new GeometryFactory();
         List<SearchObject> hdf5features = new ArrayList<>();
         String hdf5FilePath = request.getFilePath().replace("\\", "/");
-        Map<String, HDFObj> hdfobjList = new HashMap<>();
+        Map<String, HDFObj> hdfobjList = new LinkedHashMap<>();
 
         try (HdfFile hdfFile = new HdfFile(Paths.get(hdf5FilePath))) {
             if(hdfFile == null) {
@@ -256,9 +257,14 @@ public class HDF5Parser implements ObjectParser{
                                 //List<List<Double>> tmpcoordinates = new ArrayList<>();
                                 List<List<Double>> stationCoordinates = new ArrayList<>();
 
+                                String timePointStr = "";
+
                                 switch (codingFormat) {
                                     case 1:
                                     case 8:
+                                        timePointStr = (String) getIgnoreCase(objIdAttr, "dateTimeOfFirstRecord");
+                                        log.info(timePointStr);
+
                                         Object numStationObj = getIgnoreCase(objIdAttr, "numberOfStations");
                                         int numofStations = 0;
                                         if (numStationObj != null) {
@@ -362,9 +368,14 @@ public class HDF5Parser implements ObjectParser{
 
                                         Map<String, Object> valueGroupAttr = printAttributes(valuesNode);
                                         LocalDateTime timePoint = null;
-                                        if (!valueGroupAttr.isEmpty()) {
-                                            String timePointStr = (String) getIgnoreCase(valueGroupAttr, "timePoint");
-                                            if (timePointStr != null && timePointStr.length() > 15) {
+                                        if(codingFormat == 1 && timePointStr != null) {
+                                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                                            timePoint = LocalDateTime.parse(timePointStr,formatter);
+                                        }
+                                        if (!valueGroupAttr.isEmpty() && codingFormat == 2) {
+                                            timePointStr = (String) getIgnoreCase(valueGroupAttr, "timePoint");
+                                            log.info(timePointStr);
+                                            if (timePointStr != null && timePointStr.length() >= 15) {
                                                 timePointStr = timePointStr.substring(0, 15);
                                                 log.info(timePointStr);
                                                 if (timePointStr != null) {
@@ -373,6 +384,7 @@ public class HDF5Parser implements ObjectParser{
                                                 }
                                             }
                                         }
+                                        log.info("timePoint: " + timePoint);
 
                                         for (Node valueset : valueGroup) {
                                             if (valueset instanceof Dataset && valueset.getName().equalsIgnoreCase("values")) {
@@ -383,6 +395,33 @@ public class HDF5Parser implements ObjectParser{
                                                 if (codingFormat == 1) {
                                                     Map<String, Object> valuesMap = (Map<String, Object>) valuesRaw;
                                                     List<String> fieldNames = new ArrayList<>(valuesMap.keySet());
+                                                    System.out.println(fieldNames);
+
+                                                    List<String> newCodeList = new ArrayList<>(); // fieldNames 순서대로 코드명
+                                                    List<String> newUomList = new ArrayList<>();  // fieldNames 순서대로 UOM들
+
+                                                    for (String field : fieldNames) {
+                                                        String matchedCode = field;   // 기본값 = field 그대로
+                                                        String matchedUom = null;
+
+                                                        for (int i = 0; i < tmpcodeList.size(); i++) {
+                                                            String code = tmpcodeList.get(i);
+                                                            String uom = tmpuomList.get(i);
+
+                                                            if (field.toLowerCase().contains(code.toLowerCase()) ||
+                                                                    code.toLowerCase().contains(field.toLowerCase())) {
+                                                                matchedCode = field;  // fieldNames 순서 기준
+                                                                matchedUom = uom;     // 같은 인덱스 UOM
+                                                                break;
+                                                            }
+                                                        }
+
+                                                        newCodeList.add(matchedCode);
+                                                        newUomList.add(matchedUom != null ? matchedUom : "");
+                                                    }
+
+                                                    tmpcodeList = newCodeList;
+                                                    tmpuomList = newUomList;
                                                     Object firstCol = valuesMap.get(fieldNames.get(0));
                                                     int numValues = (firstCol != null && firstCol.getClass().isArray()) ? Array.getLength(firstCol) : 1;
 
@@ -447,6 +486,32 @@ public class HDF5Parser implements ObjectParser{
                                                     } else {
                                                         Map<String, Object> valuesMap = (Map<String, Object>) valuesRaw;
                                                         List<String> fieldNames = new ArrayList<>(valuesMap.keySet());
+                                                        System.out.println(fieldNames);
+                                                        List<String> newCodeList = new ArrayList<>(); // fieldNames 순서대로 코드명
+                                                        List<String> newUomList = new ArrayList<>();  // fieldNames 순서대로 UOM들
+
+                                                        for (String field : fieldNames) {
+                                                            String matchedCode = field;   // 기본값 = field 그대로
+                                                            String matchedUom = null;
+
+                                                            for (int i = 0; i < tmpcodeList.size(); i++) {
+                                                                String code = tmpcodeList.get(i);
+                                                                String uom = tmpuomList.get(i);
+
+                                                                if (field.toLowerCase().contains(code.toLowerCase()) ||
+                                                                        code.toLowerCase().contains(field.toLowerCase())) {
+                                                                    matchedCode = field;  // fieldNames 순서 기준
+                                                                    matchedUom = uom;     // 같은 인덱스 UOM
+                                                                    break;
+                                                                }
+                                                            }
+
+                                                            newCodeList.add(matchedCode);
+                                                            newUomList.add(matchedUom != null ? matchedUom : "");
+                                                        }
+
+                                                        tmpcodeList = newCodeList;
+                                                        tmpuomList = newUomList;
 
                                                         Object firstCol = valuesMap.get(fieldNames.get(0));
                                                         int latSize = firstCol.getClass().isArray() ? Array.getLength(firstCol) : 1;

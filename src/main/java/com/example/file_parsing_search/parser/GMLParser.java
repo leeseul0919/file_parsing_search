@@ -229,8 +229,8 @@ public class GMLParser implements ObjectParser{
                     }
                 }
                 if(!tmpObjInfos.isEmpty()) {
-                    Map<String, String> linkObjects = new HashMap<>();
-                    Map<String, Object> attributes = new HashMap<>();
+                    Map<String, String> linkObjects = new TreeMap<>();
+                    Map<String, Object> attributes = new TreeMap<>();
 
                     NodeList linkedNodes = (NodeList) xpath.evaluate(
                             ".//*[@*[local-name()='href']]",
