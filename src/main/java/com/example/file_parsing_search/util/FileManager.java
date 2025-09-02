@@ -72,6 +72,7 @@ public class FileManager {
             if (file.isFile()) {
                 String ext = getExtension(file.getPath()).toLowerCase();
                 String fileType = getFileTypeByExtension(ext);
+                log.info(fileType);
 
                 // 1차로 대상 확장자가 아닌거 거르기
                 if (fileType == null) {

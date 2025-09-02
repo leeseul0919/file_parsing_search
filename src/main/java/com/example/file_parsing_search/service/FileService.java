@@ -5,6 +5,8 @@ import com.example.file_parsing_search.dto.CapabilityDto;
 import com.example.file_parsing_search.dto.GetObjectRequestDto;
 import com.example.file_parsing_search.dto.GetObjectResponseDto;
 import com.example.file_parsing_search.dto.SearchObject;
+import com.example.file_parsing_search.exception.CustomException;
+import com.example.file_parsing_search.exception.ErrorCode;
 import com.example.file_parsing_search.mapper.HistoryMapper;
 import com.example.file_parsing_search.parser.ObjectParser;
 import com.example.file_parsing_search.util.FileManager;
@@ -49,15 +51,18 @@ public class FileService {
 
         //1. 파일명 받은걸로 파일 정보 불러오고
         CapabilityDto fileInfo = fileManager.getFileInfo(request.getFilePath())
-                .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + request.getFilePath()));
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND_FILE));
+                        //RuntimeException("파일을 찾을 수 없습니다: " + request.getFilePath()));
 
         //2. 파일 타입에 따른 파서 불러와서 작업 (파일 정보, request)
         ObjectParser parser = fileManager.getParserByFileType(fileInfo.getFileType());
         if (parser == null) {
-            throw new UnsupportedOperationException("Unsupported file type: " + fileInfo.getFileType());
+            throw new CustomException(ErrorCode.INVALID_FILE_TYPE);
+                    //UnsupportedOperationException("Unsupported file type: " + fileInfo.getFileType());
         }
 
         List<?> requestCoordinates = request.getGeometryInfo().getCoordinates();
+        validateCoordinates(requestCoordinates);
         Polygon polygon = null;
         switch(request.getGeometryInfo().getType()) {
             case "Circle":
@@ -77,7 +82,7 @@ public class FileService {
                 break;
             default:
                 log.error("지원하지 않는 범위 형태");
-                throw new IllegalArgumentException("Unsupported geometry type");    // Todo: 에러 처리
+                throw new CustomException(ErrorCode.INVALID_RANGE_TYPE);    // Todo: 에러 처리
         }
 
         List<SearchObject> objectsList = parser.parse(request, polygon);
@@ -89,6 +94,37 @@ public class FileService {
     public void saveHistory(History history) {
         historyMapper.insert(history);
     }
+
+    public void validateCoordinates(List<?> coordinates) {
+        if (coordinates == null || coordinates.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_PARAMETERS);
+        }
+
+        // 1차원인지 2차원인지 판별
+        Object first = coordinates.get(0);
+
+        if (first instanceof List<?>) {
+            // 2차원 좌표
+            for (Object inner : coordinates) {
+                if (!(inner instanceof List<?> innerList)) {
+                    throw new CustomException(ErrorCode.INVALID_PARAMETERS);
+                }
+                for (Object value : innerList) {
+                    if (!(value instanceof Number)) { // Double, Integer 모두 허용
+                        throw new CustomException(ErrorCode.INVALID_PARAMETERS);
+                    }
+                }
+            }
+        } else {
+            // 1차원 좌표
+            for (Object value : coordinates) {
+                if (!(value instanceof Number)) {
+                    throw new CustomException(ErrorCode.INVALID_PARAMETERS);
+                }
+            }
+        }
+    }
+
 
     public Polygon createPolygon(List<List<Double>> coords) {
         GeometryFactory gf = new GeometryFactory();
