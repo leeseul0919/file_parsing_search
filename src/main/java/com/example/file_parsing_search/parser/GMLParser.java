@@ -261,13 +261,13 @@ public class GMLParser implements ObjectParser{
                     SearchObject newobject = new SearchObject(firstChild.getTagName(),gmlId,null,null,attributes,tmpObjInfos,null);
                     gmlfeatures.add(newobject);
                 }
-                else {
-                    throw new CustomException(ErrorCode.NO_RESULTS_FOUND);
-                }
             }
             log.info("total: " + gmlfeatures.size());
         } catch (ParserConfigurationException | SAXException | IOException e) {
             throw new CustomException(ErrorCode.FAIL_READ_XML);
+        }
+        if (gmlfeatures.isEmpty()) {
+            throw new CustomException(ErrorCode.NO_RESULTS_FOUND);
         }
         return gmlfeatures;
     }
