@@ -11,6 +11,10 @@ import com.example.file_parsing_search.mapper.HistoryMapper;
 import com.example.file_parsing_search.parser.ObjectParser;
 import com.example.file_parsing_search.util.FileManager;
 import lombok.extern.slf4j.Slf4j;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.referencing.CRS;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xml.sax.SAXException;
@@ -61,6 +65,9 @@ public class FileService {
                     //UnsupportedOperationException("Unsupported file type: " + fileInfo.getFileType());
         }
 
+        String requestCrs = "EPSG:4326";
+        String fileCRS = fileInfo.getCRS();
+
         List<?> requestCoordinates = request.getGeometryInfo().getCoordinates();
         validateCoordinates(requestCoordinates);
         Polygon polygon = null;
@@ -84,8 +91,13 @@ public class FileService {
                 log.error("지원하지 않는 범위 형태");
                 throw new CustomException(ErrorCode.INVALID_RANGE_TYPE);    // Todo: 에러 처리
         }
+        //좌표계 변환 (GeoTools 사용)
+        CoordinateReferenceSystem sourceCRS = CRS.decode(requestCrs);
+        CoordinateReferenceSystem targetCRS = CRS.decode(fileCRS);
+        MathTransform transform = CRS.findMathTransform(sourceCRS, targetCRS, true);
+        Polygon transformedPolygon = (Polygon) JTS.transform(polygon, transform);
 
-        List<SearchObject> objectsList = parser.parse(request, polygon);
+        List<SearchObject> objectsList = parser.parse(request, transformedPolygon);
         responsedto.setFeatures(objectsList);
 
         return responsedto;

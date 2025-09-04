@@ -59,7 +59,7 @@ public class FileManager {
 
         File baseDir = new File(uploadDir);
         if (!baseDir.exists() || !baseDir.isDirectory()) {
-            log.error("기본 업로드 폴더가 없습니다: {}", uploadDir);    // Todo: 폴더 없을 때 예외 발생, 폴더 인식 못하는 경우?
+            log.error("기본 업로드 폴더가 없습니다: {}", uploadDir);
             return resultFiles;
         }
 
@@ -79,7 +79,7 @@ public class FileManager {
                     continue;
                 }
 
-                // 2차로 확장자로 파서를 찾았을 때 없는 경우 거르기,
+                // 2차로 확장자로 파서를 찾았을 때 없는 경우 거르기
                 ObjectParser parser = getParserByFileType(fileType);
                 if (parser == null) {
                     continue;
