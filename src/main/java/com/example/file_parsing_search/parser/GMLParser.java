@@ -370,7 +370,7 @@ public class GMLParser implements ObjectParser{
 
     private List<Object> parseLinearRing(Node ringNode, XPath xpath) throws Exception {
         Node posListNode = (Node) xpath.evaluate(".//*[local-name()='posList']", ringNode, XPathConstants.NODE);
-        Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
+        //Node coordinatesListNode = (Node) xpath.evaluate(".//*[local-name()='coordinates']", ringNode, XPathConstants.NODE);
         List<Object> coordinates = new ArrayList<>();
 
         if (posListNode != null) {
