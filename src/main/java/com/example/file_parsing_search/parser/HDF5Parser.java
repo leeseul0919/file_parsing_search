@@ -360,10 +360,11 @@ public class HDF5Parser implements ObjectParser {
                         Map<String, Object> rawData = (Map<String, Object>) coordinatesDataset.getData();
                         Object lonArr = rawData.get(lonKey);
                         Object latArr = rawData.get(latKey);
-                        float[] longitudes = (float[]) lonArr;
-                        float[] latitudes = (float[]) latArr;
-                        for (int i = 0; i < numofStations; i++) {
-                            coords.add(List.of(round6((double) longitudes[i]), round6((double) latitudes[i])));
+                        double[] longitudes = toDoubleArray(lonArr);
+                        double[] latitudes  = toDoubleArray(latArr);
+                        int count = Math.min(numofStations, Math.min(longitudes.length, latitudes.length));
+                        for (int i = 0; i < count; i++) {
+                            coords.add(List.of(round6(longitudes[i]), round6(latitudes[i])));
                         }
                     } catch (Exception e) {
                         log.warn("Failed to parse coordinates dataset: {}", e.getMessage());
@@ -559,6 +560,17 @@ public class HDF5Parser implements ObjectParser {
         } else {
             out.add(raw.toString());
         }
+    }
+
+    private double[] toDoubleArray(Object arr) {
+        if (arr == null) return new double[0];
+        int len = Array.getLength(arr);
+        double[] out = new double[len];
+        for (int i = 0; i < len; i++) {
+            Object v = Array.get(arr, i);
+            out[i] = (v instanceof Number) ? ((Number) v).doubleValue() : Double.NaN;
+        }
+        return out;
     }
 
     private Object castPrimitive(Object val) {
